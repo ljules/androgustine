@@ -25,7 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.augustine.androgustine.R
-import fr.augustine.androgustine.data.imports.readFileImportSummary
+import fr.augustine.androgustine.data.imports.SimAugustineImportSummary
+import fr.augustine.androgustine.data.imports.readSimAugustineImport
 import fr.augustine.androgustine.ui.components.CircuitView
 import fr.augustine.androgustine.ui.theme.OxaniumFontFamily
 import fr.augustine.androgustine.ui.theme.ShellGrey
@@ -37,6 +38,7 @@ import fr.augustine.androgustine.viewmodel.RaceViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 @Composable
 fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
@@ -54,25 +56,18 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             return@rememberLauncherForActivityResult
         }
 
-        importSummaryText = "Lecture du fichier..."
+        importSummaryText = "Import de la session..."
         coroutineScope.launch {
             importSummaryText = runCatching {
                 withContext(Dispatchers.IO) {
-                    readFileImportSummary(contentResolver, uri)
+                    readSimAugustineImport(contentResolver, uri)
                 }
             }.fold(
                 onSuccess = { summary ->
-                    buildString {
-                        appendLine("Nom : ${summary.name ?: "non disponible"}")
-                        appendLine("Type MIME : ${summary.mimeType ?: "non disponible"}")
-                        appendLine("Taille : ${summary.sizeBytes?.let { "$it octets" } ?: "non disponible"}")
-                        appendLine("Caracteres lus : ${summary.characterCount}")
-                        appendLine("Apercu 200 caracteres :")
-                        append(summary.preview)
-                    }
+                    summary.toDisplayText()
                 },
                 onFailure = { error ->
-                    "Erreur de lecture : ${error.localizedMessage ?: error.message ?: "erreur inconnue"}"
+                    "Erreur d'import : ${error.localizedMessage ?: error.message ?: "fichier non compatible"}"
                 }
             )
         }
@@ -250,8 +245,6 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     filePickerLauncher.launch(
                         arrayOf(
                             "text/*",
-                            "text/csv",
-                            "application/csv",
                             "application/json",
                             "text/json"
                         )
@@ -279,3 +272,22 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
         }
     }
 }
+
+private fun SimAugustineImportSummary.toDisplayText(): String = buildString {
+    appendLine("Schema : $schemaVersion")
+    appendLine("Circuit : $circuitName")
+    appendLine("Distance circuit : ${formatNumber(circuitDistanceM)} m")
+    appendLine("Points circuit : $circuitPointCount")
+    appendLine("Tours total : $totalLaps")
+    appendLine("Tours course restants : $remainingRaceLaps")
+    appendLine("Temps tour depart : ${formatNumber(startLapTimeS)} s")
+    appendLine("Temps tour course : ${formatNumber(raceLapTimeS)} s")
+    appendLine("Energie session : ${formatNumber(sessionEnergyJ)} J")
+    appendLine("Intervalles depart : $startStrategyIntervalCount")
+    appendLine("Intervalles course : $raceStrategyIntervalCount")
+    appendLine("Points ghost depart : $startGhostPointCount")
+    append("Points ghost course : $raceGhostPointCount")
+}
+
+private fun formatNumber(value: Double): String =
+    String.format(Locale.US, "%.2f", value)
