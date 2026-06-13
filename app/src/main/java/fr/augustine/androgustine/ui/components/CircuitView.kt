@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import fr.augustine.androgustine.data.CircuitPoint
+import fr.augustine.androgustine.data.GhostPoint
 import fr.augustine.androgustine.data.StrategyIntervalUi
 import fr.augustine.androgustine.ui.theme.ShellOrange
 import kotlin.math.min
@@ -22,6 +23,7 @@ fun CircuitView(
     currentLat: Double,
     currentLon: Double,
     strategyIntervals: List<StrategyIntervalUi> = emptyList(),
+    ghostPoint: GhostPoint? = null,
     modifier: Modifier = Modifier
 ) {
     if (points.isEmpty()) return
@@ -72,6 +74,20 @@ fun CircuitView(
                     strokeWidth = 16f
                 )
             }
+        }
+
+        ghostPoint?.let { point ->
+            val ghostCoords = getCanvasCoords(point.utmX, point.utmY)
+            drawCircle(
+                color = Color(0xFF00E5FF).copy(alpha = 0.35f),
+                radius = 20f,
+                center = ghostCoords
+            )
+            drawCircle(
+                color = Color(0xFF00E5FF),
+                radius = 10f,
+                center = ghostCoords
+            )
         }
 
         val closestPoint = points.minByOrNull { pt ->

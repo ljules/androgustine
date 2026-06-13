@@ -142,6 +142,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                         currentLat = uiState.currentLat,
                         currentLon = uiState.currentLon,
                         strategyIntervals = uiState.activeStrategyIntervals,
+                        ghostPoint = uiState.ghostPoint,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -257,6 +258,24 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     fontWeight = FontWeight.Medium
                 )
             )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Ghost : ${if (uiState.ghostPoint != null) "active" else "inactive"}",
+                style = textStyle.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            )
+            uiState.ghostDeltaDistanceM?.let { delta ->
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Delta distance : ${formatNumber(delta.toDouble())} m",
+                    style = textStyle.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
             Spacer(Modifier.height(6.dp))
             Button(
                 onClick = {

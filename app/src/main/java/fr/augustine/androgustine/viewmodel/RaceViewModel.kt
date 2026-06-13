@@ -6,6 +6,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fr.augustine.androgustine.data.CircuitManager
+import fr.augustine.androgustine.data.CircuitPoint
+import fr.augustine.androgustine.data.GhostPoint
 import fr.augustine.androgustine.data.gps.GpsService
 import fr.augustine.androgustine.data.imports.SimAugustineImportRepository
 import fr.augustine.androgustine.data.timer.TimeService
@@ -27,6 +29,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
     private var isTimerRunning = false
     private var lastLapTimestamp = 0L
+    private var currentLapStartedAtMs = 0L
 
     // CONFIGURATION DE LA COURSE
     companion object {
@@ -56,7 +59,12 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                     activeStrategyName = "Départ",
                     activeStrategyIntervals = emptyList(),
                     startStrategyIntervals = emptyList(),
-                    raceStrategyIntervals = emptyList()
+                    raceStrategyIntervals = emptyList(),
+                    startGhostPoints = emptyList(),
+                    raceGhostPoints = emptyList(),
+                    ghostPoint = null,
+                    ghostDistanceM = null,
+                    ghostDeltaDistanceM = null
                 )
             } catch (e: Exception) {
                 Log.e("RaceViewModel", "CRASH lors du chargement : ${e.message}")
@@ -72,8 +80,16 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
             activeStrategyName = "Départ",
             activeStrategyIntervals = importedCircuit.startStrategyIntervals,
             startStrategyIntervals = importedCircuit.startStrategyIntervals,
-            raceStrategyIntervals = importedCircuit.raceStrategyIntervals
+            raceStrategyIntervals = importedCircuit.raceStrategyIntervals,
+            startGhostPoints = importedCircuit.startGhostPoints,
+            raceGhostPoints = importedCircuit.raceGhostPoints,
+            ghostPoint = null,
+            ghostDistanceM = null,
+            ghostDeltaDistanceM = null
         )
+        if (isTimerRunning) {
+            updateGhostPosition()
+        }
     }
 
     private fun startGpsTracking() {
@@ -101,12 +117,15 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startRaceTimer() {
         isTimerRunning = true
-        lastLapTimestamp = System.currentTimeMillis() // Le chrono commence, le tour 1 aussi
+        val now = System.currentTimeMillis()
+        lastLapTimestamp = now // Le chrono commence, le tour 1 aussi
+        currentLapStartedAtMs = now
         viewModelScope.launch {
             timeService.timerFlow().collect { seconds ->
                 _uiState.value = _uiState.value.copy(
                     timer = timeService.formatSeconds(seconds)
                 )
+                updateGhostPosition()
             }
         }
     }
@@ -152,6 +171,98 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 activeStrategyName = nextStrategyName,
                 activeStrategyIntervals = nextStrategyIntervals
             )
+            currentLapStartedAtMs = System.currentTimeMillis()
+            updateGhostPosition()
         }
     }
+
+    private fun updateGhostPosition() {
+        if (!isTimerRunning || currentLapStartedAtMs == 0L) {
+            clearGhostPosition()
+            return
+        }
+
+        val state = _uiState.value
+        val ghostSamples = if (getCurrentLapNumber(state) >= 2) {
+            state.raceGhostPoints
+        } else {
+            state.startGhostPoints
+        }
+
+        val elapsedTimeS = (System.currentTimeMillis() - currentLapStartedAtMs) / 1000.0
+        val ghostPoint = interpolateGhostPoint(ghostSamples, elapsedTimeS)
+        if (ghostPoint == null) {
+            clearGhostPosition()
+            return
+        }
+
+        val realDistanceM = findNearestCircuitDistance(
+            state.circuitPoints,
+            state.currentLat,
+            state.currentLon
+        )
+
+        _uiState.value = state.copy(
+            ghostPoint = ghostPoint,
+            ghostDistanceM = ghostPoint.distanceM,
+            ghostDeltaDistanceM = realDistanceM?.let { it - ghostPoint.distanceM }
+        )
+    }
+
+    private fun clearGhostPosition() {
+        val state = _uiState.value
+        if (state.ghostPoint != null || state.ghostDistanceM != null || state.ghostDeltaDistanceM != null) {
+            _uiState.value = state.copy(
+                ghostPoint = null,
+                ghostDistanceM = null,
+                ghostDeltaDistanceM = null
+            )
+        }
+    }
+
+    private fun interpolateGhostPoint(samples: List<GhostPoint>, elapsedTimeS: Double): GhostPoint? {
+        if (samples.isEmpty()) return null
+        if (samples.size == 1 || elapsedTimeS <= samples.first().timeS) return samples.first()
+        if (elapsedTimeS >= samples.last().timeS) return samples.last()
+
+        val nextIndex = samples.indexOfFirst { it.timeS >= elapsedTimeS }
+        if (nextIndex <= 0) return samples.first()
+
+        val previous = samples[nextIndex - 1]
+        val next = samples[nextIndex]
+        val duration = next.timeS - previous.timeS
+        if (duration <= 0.0) return previous
+
+        val ratio = ((elapsedTimeS - previous.timeS) / duration).coerceIn(0.0, 1.0)
+        return GhostPoint(
+            timeS = elapsedTimeS,
+            distanceM = interpolate(previous.distanceM, next.distanceM, ratio),
+            utmX = interpolate(previous.utmX, next.utmX, ratio),
+            utmY = interpolate(previous.utmY, next.utmY, ratio),
+            lon = interpolate(previous.lon, next.lon, ratio),
+            lat = interpolate(previous.lat, next.lat, ratio)
+        )
+    }
+
+    private fun findNearestCircuitDistance(
+        points: List<CircuitPoint>,
+        currentLat: Double,
+        currentLon: Double
+    ): Float? {
+        if (points.isEmpty()) return null
+        return points.minByOrNull { point ->
+            val latDelta = point.lat - currentLat
+            val lonDelta = point.lon - currentLon
+            latDelta * latDelta + lonDelta * lonDelta
+        }?.distance
+    }
+
+    private fun getCurrentLapNumber(state: PilotUiState): Int =
+        state.lapProgress.substringBefore("/").toIntOrNull() ?: 1
+
+    private fun interpolate(start: Float, end: Float, ratio: Double): Float =
+        (start + ((end - start) * ratio)).toFloat()
+
+    private fun interpolate(start: Double, end: Double, ratio: Double): Double =
+        start + ((end - start) * ratio)
 }

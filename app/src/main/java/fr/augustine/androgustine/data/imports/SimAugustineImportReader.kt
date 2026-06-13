@@ -3,6 +3,7 @@ package fr.augustine.androgustine.data.imports
 import android.content.ContentResolver
 import android.net.Uri
 import fr.augustine.androgustine.data.CircuitPoint
+import fr.augustine.androgustine.data.GhostPoint
 import fr.augustine.androgustine.data.StrategyIntervalUi
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -57,7 +58,7 @@ private fun SimAugustineImport.toSummary(
     val circuit = requireBlock(circuit, "circuit")
     val session = requireBlock(session, "session")
     val simulation = requireBlock(simulation, "simulation")
-    val ghost = requireBlock(ghost, "ghost")
+    val ghostBlock = ghost
     val circuitName = requireText(circuit.name, "circuit.name")
     val circuitDistanceM = requireValue(circuit.distanceM, "circuit.distanceM")
     val circuitPoints = requireList(circuit.points, "circuit.points")
@@ -66,20 +67,13 @@ private fun SimAugustineImport.toSummary(
     val startLapResult = requireBlock(simulation.startLapResult, "simulation.startLapResult")
     val raceLapResult = requireBlock(simulation.raceLapResult, "simulation.raceLapResult")
     val sessionResult = requireBlock(simulation.sessionResult, "simulation.sessionResult")
-    val startGhost = requireList(ghost.startLap, "ghost.startLap")
-    val raceGhost = requireList(ghost.raceLap, "ghost.raceLap")
+    val startGhost = ghostBlock?.startLap.orEmpty()
+    val raceGhost = ghostBlock?.raceLap.orEmpty()
     val canvasDistances = importedCircuit.points.map { it.distance }
 
     if (circuitPoints.isEmpty()) {
         throw SimAugustineImportException("Import incomplet : circuit.points est vide.")
     }
-    if (startGhost.isEmpty()) {
-        throw SimAugustineImportException("Import incomplet : ghost.startLap est vide.")
-    }
-    if (raceGhost.isEmpty()) {
-        throw SimAugustineImportException("Import incomplet : ghost.raceLap est vide.")
-    }
-
     return SimAugustineImportSummary(
         schemaVersion = schemaVersion,
         circuitName = circuitName,
@@ -119,9 +113,17 @@ private fun SimAugustineImport.toImportedCircuit(): SimAugustineImportedCircuit 
         startStrategyIntervals = session?.startLapStrategy?.intervals.orEmpty()
             .mapNotNull { it.toStrategyIntervalUi() },
         raceStrategyIntervals = session?.raceLapStrategy?.intervals.orEmpty()
-            .mapNotNull { it.toStrategyIntervalUi() }
+            .mapNotNull { it.toStrategyIntervalUi() },
+        startGhostPoints = sessionGhostStartPoints(),
+        raceGhostPoints = sessionGhostRacePoints()
     )
 }
+
+private fun SimAugustineImport.sessionGhostStartPoints(): List<GhostPoint> =
+    ghost?.startLap.orEmpty().mapNotNull { it.toGhostPoint() }.sortedBy { it.timeS }
+
+private fun SimAugustineImport.sessionGhostRacePoints(): List<GhostPoint> =
+    ghost?.raceLap.orEmpty().mapNotNull { it.toGhostPoint() }.sortedBy { it.timeS }
 
 private fun SimAugustineCircuitPoint.toCircuitPoint(index: Int): CircuitPoint {
     val lat = requireValue(lat, "circuit.points[$index].lat")
@@ -147,6 +149,21 @@ private fun SimAugustineStrategyInterval.toStrategyIntervalUi(): StrategyInterva
         startDistanceM = startDistance.toFloat(),
         endDistanceM = endDistance.toFloat(),
         buttonColor = buttonColor
+    )
+}
+
+private fun SimAugustineGhostPoint.toGhostPoint(): GhostPoint? {
+    val time = timeS ?: return null
+    val distance = distanceM ?: return null
+    val pointLat = lat ?: return null
+    val pointLon = lon ?: return null
+    return GhostPoint(
+        timeS = time,
+        distanceM = distance.toFloat(),
+        utmX = utmX ?: pointLon,
+        utmY = utmY ?: pointLat,
+        lon = pointLon,
+        lat = pointLat
     )
 }
 

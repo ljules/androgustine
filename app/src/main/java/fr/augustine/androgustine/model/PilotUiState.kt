@@ -2,6 +2,7 @@ package fr.augustine.androgustine.model
 
 import androidx.compose.ui.graphics.Color
 import fr.augustine.androgustine.data.CircuitPoint
+import fr.augustine.androgustine.data.GhostPoint
 import fr.augustine.androgustine.data.StrategyIntervalUi
 
 data class PilotUiState(
@@ -14,6 +15,11 @@ data class PilotUiState(
     val activeStrategyIntervals: List<StrategyIntervalUi> = emptyList(),
     val startStrategyIntervals: List<StrategyIntervalUi> = emptyList(),
     val raceStrategyIntervals: List<StrategyIntervalUi> = emptyList(),
+    val startGhostPoints: List<GhostPoint> = emptyList(),
+    val raceGhostPoints: List<GhostPoint> = emptyList(),
+    val ghostPoint: GhostPoint? = null,
+    val ghostDistanceM: Float? = null,
+    val ghostDeltaDistanceM: Float? = null,
     val currentLat: Double = 0.0,
     val currentLon: Double = 0.0,
     val instruction: String = "MAINTENIR",
