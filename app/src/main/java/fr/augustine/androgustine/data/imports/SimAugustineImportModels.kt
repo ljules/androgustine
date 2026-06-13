@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.decodeFromJsonElement
 import fr.augustine.androgustine.data.CircuitPoint
+import fr.augustine.androgustine.data.StrategyIntervalUi
 
 @Serializable
 data class SimAugustineImport(
@@ -157,10 +158,13 @@ data class SimAugustineImportSummary(
     val startGhostPointCount: Int,
     val raceGhostPointCount: Int,
     val startStrategyIntervalCount: Int,
-    val raceStrategyIntervalCount: Int
+    val raceStrategyIntervalCount: Int,
+    val displayedStrategyName: String?,
+    val displayedStrategyIntervalCount: Int
 )
 
 data class SimAugustineImportedCircuit(
     val points: List<CircuitPoint>,
-    val sourceLabel: String
+    val sourceLabel: String,
+    val startStrategyIntervals: List<StrategyIntervalUi>
 )

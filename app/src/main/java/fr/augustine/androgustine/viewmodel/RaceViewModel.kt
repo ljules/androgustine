@@ -52,7 +52,8 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 val points = circuitManager.loadCircuitFromInternalStorage()
                 _uiState.value = _uiState.value.copy(
                     circuitPoints = points,
-                    circuitSource = "CSV local"
+                    circuitSource = "CSV local",
+                    startStrategyIntervals = emptyList()
                 )
             } catch (e: Exception) {
                 Log.e("RaceViewModel", "CRASH lors du chargement : ${e.message}")
@@ -64,7 +65,8 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         val importedCircuit = SimAugustineImportRepository.getCurrentCircuit() ?: return
         _uiState.value = _uiState.value.copy(
             circuitPoints = importedCircuit.points,
-            circuitSource = importedCircuit.sourceLabel
+            circuitSource = importedCircuit.sourceLabel,
+            startStrategyIntervals = importedCircuit.startStrategyIntervals
         )
     }
 

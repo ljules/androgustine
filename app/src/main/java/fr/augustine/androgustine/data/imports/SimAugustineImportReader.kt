@@ -3,6 +3,7 @@ package fr.augustine.androgustine.data.imports
 import android.content.ContentResolver
 import android.net.Uri
 import fr.augustine.androgustine.data.CircuitPoint
+import fr.augustine.androgustine.data.StrategyIntervalUi
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -92,7 +93,9 @@ private fun SimAugustineImport.toSummary(
         startGhostPointCount = startGhost.size,
         raceGhostPointCount = raceGhost.size,
         startStrategyIntervalCount = session.startLapStrategy?.intervals?.size ?: 0,
-        raceStrategyIntervalCount = session.raceLapStrategy?.intervals?.size ?: 0
+        raceStrategyIntervalCount = session.raceLapStrategy?.intervals?.size ?: 0,
+        displayedStrategyName = "tour depart",
+        displayedStrategyIntervalCount = importedCircuit.startStrategyIntervals.size
     )
 }
 
@@ -107,7 +110,9 @@ private fun SimAugustineImport.toImportedCircuit(): SimAugustineImportedCircuit 
         points = points.mapIndexed { index, point ->
             point.toCircuitPoint(index)
         },
-        sourceLabel = "JSON Sim-Augustine"
+        sourceLabel = "JSON Sim-Augustine",
+        startStrategyIntervals = session?.startLapStrategy?.intervals.orEmpty()
+            .mapNotNull { it.toStrategyIntervalUi() }
     )
 }
 
@@ -122,6 +127,19 @@ private fun SimAugustineCircuitPoint.toCircuitPoint(index: Int): CircuitPoint {
         utmY = utmY ?: lat,
         lon = lon,
         lat = lat
+    )
+}
+
+private fun SimAugustineStrategyInterval.toStrategyIntervalUi(): StrategyIntervalUi? {
+    val startDistance = startDistanceM ?: return null
+    val endDistance = endDistanceM ?: return null
+    if (endDistance <= startDistance) {
+        return null
+    }
+    return StrategyIntervalUi(
+        startDistanceM = startDistance.toFloat(),
+        endDistanceM = endDistance.toFloat(),
+        buttonColor = buttonColor
     )
 }
 

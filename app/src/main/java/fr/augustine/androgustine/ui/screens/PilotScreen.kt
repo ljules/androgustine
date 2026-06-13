@@ -141,6 +141,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                         points = uiState.circuitPoints,
                         currentLat = uiState.currentLat,
                         currentLon = uiState.currentLon,
+                        strategyIntervals = uiState.startStrategyIntervals,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -293,6 +294,8 @@ private fun SimAugustineImportSummary.toDisplayText(): String = buildString {
     appendLine("Temps tour depart : ${formatNumber(startLapTimeS)} s")
     appendLine("Temps tour course : ${formatNumber(raceLapTimeS)} s")
     appendLine("Energie session : ${formatNumber(sessionEnergyJ)} J")
+    appendLine("Strategie affichee : ${displayedStrategyName ?: "aucune"}")
+    appendLine("Intervalles affiches : $displayedStrategyIntervalCount")
     appendLine("Intervalles depart : $startStrategyIntervalCount")
     appendLine("Intervalles course : $raceStrategyIntervalCount")
     appendLine("Points ghost depart : $startGhostPointCount")

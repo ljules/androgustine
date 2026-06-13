@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import fr.augustine.androgustine.data.CircuitPoint
+import fr.augustine.androgustine.data.StrategyIntervalUi
 import fr.augustine.androgustine.ui.theme.ShellOrange
 import kotlin.math.min
 import kotlin.math.pow
@@ -20,6 +21,7 @@ fun CircuitView(
     points: List<CircuitPoint>,
     currentLat: Double,
     currentLon: Double,
+    strategyIntervals: List<StrategyIntervalUi> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     if (points.isEmpty()) return
@@ -65,6 +67,50 @@ fun CircuitView(
             style = Stroke(width = 12f) // Piste plus épaisse
         )
 
+        strategyIntervals.forEach { interval ->
+            val intervalPath = Path()
+            var hasSegment = false
+            var previousPoint: CircuitPoint? = null
+            var finished = false
+
+            points.forEach { point ->
+                if (finished) {
+                    return@forEach
+                }
+
+                if (point.distance in interval.startDistanceM..interval.endDistanceM) {
+                    val coords = getCanvasCoords(point.utmX, point.utmY)
+                    if (!hasSegment) {
+                        previousPoint?.let { previous ->
+                            if (previous.distance < interval.startDistanceM) {
+                                val previousCoords = getCanvasCoords(previous.utmX, previous.utmY)
+                                intervalPath.moveTo(previousCoords.x, previousCoords.y)
+                                intervalPath.lineTo(coords.x, coords.y)
+                            } else {
+                                intervalPath.moveTo(coords.x, coords.y)
+                            }
+                        } ?: intervalPath.moveTo(coords.x, coords.y)
+                        hasSegment = true
+                    } else {
+                        intervalPath.lineTo(coords.x, coords.y)
+                    }
+                } else if (hasSegment && point.distance > interval.endDistanceM) {
+                    val coords = getCanvasCoords(point.utmX, point.utmY)
+                    intervalPath.lineTo(coords.x, coords.y)
+                    finished = true
+                }
+                previousPoint = point
+            }
+
+            if (hasSegment) {
+                drawPath(
+                    path = intervalPath,
+                    color = interval.buttonColor.toStrategyColor(),
+                    style = Stroke(width = 16f)
+                )
+            }
+        }
+
         // AIMANTATION ET DESSIN DE LA PILOTE :
         // On cherche le point du CSV le plus proche de la position GPS réelle
         val closestPoint = points.minByOrNull { pt ->
@@ -89,4 +135,13 @@ fun CircuitView(
         }
 
     }
+}
+
+private fun String?.toStrategyColor(): Color = when (this?.lowercase()) {
+    "green" -> Color(0xFF2ECC71)
+    "yellow" -> Color(0xFFFFD43B)
+    "blue" -> Color(0xFF4D96FF)
+    "orange" -> Color(0xFFFF8C00)
+    "red" -> Color(0xFFFF4D4D)
+    else -> Color(0xFFB8E986)
 }

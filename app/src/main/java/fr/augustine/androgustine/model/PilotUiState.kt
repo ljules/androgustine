@@ -2,6 +2,7 @@ package fr.augustine.androgustine.model
 
 import androidx.compose.ui.graphics.Color
 import fr.augustine.androgustine.data.CircuitPoint
+import fr.augustine.androgustine.data.StrategyIntervalUi
 
 data class PilotUiState(
     val speed: Float = 0f,
@@ -9,6 +10,7 @@ data class PilotUiState(
     val lapProgress: String = "1/11",
     val circuitPoints: List<CircuitPoint> = emptyList(),
     val circuitSource: String = "CSV local",
+    val startStrategyIntervals: List<StrategyIntervalUi> = emptyList(),
     val currentLat: Double = 0.0,
     val currentLon: Double = 0.0,
     val instruction: String = "MAINTENIR",
