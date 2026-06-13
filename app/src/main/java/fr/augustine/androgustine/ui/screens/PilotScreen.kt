@@ -2,10 +2,15 @@ package fr.augustine.androgustine.ui.screens
 
 import android.app.Activity
 import android.view.WindowManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.augustine.androgustine.R
+import fr.augustine.androgustine.data.imports.readFileImportSummary
 import fr.augustine.androgustine.ui.components.CircuitView
 import fr.augustine.androgustine.ui.theme.OxaniumFontFamily
 import fr.augustine.androgustine.ui.theme.ShellGrey
@@ -28,12 +34,49 @@ import fr.augustine.androgustine.ui.theme.FlagGreen
 import fr.augustine.androgustine.ui.theme.FlagYellow
 import fr.augustine.androgustine.ui.theme.DangerRed
 import fr.augustine.androgustine.viewmodel.RaceViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
 
     // Désactivation de la veille de l'écran quand la page est au 1er plan :
     val context = LocalContext.current
+    val contentResolver = context.contentResolver
+    val coroutineScope = rememberCoroutineScope()
+    var importSummaryText by remember { mutableStateOf<String?>(null) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) {
+            return@rememberLauncherForActivityResult
+        }
+
+        importSummaryText = "Lecture du fichier..."
+        coroutineScope.launch {
+            importSummaryText = runCatching {
+                withContext(Dispatchers.IO) {
+                    readFileImportSummary(contentResolver, uri)
+                }
+            }.fold(
+                onSuccess = { summary ->
+                    buildString {
+                        appendLine("Nom : ${summary.name ?: "non disponible"}")
+                        appendLine("Type MIME : ${summary.mimeType ?: "non disponible"}")
+                        appendLine("Taille : ${summary.sizeBytes?.let { "$it octets" } ?: "non disponible"}")
+                        appendLine("Caracteres lus : ${summary.characterCount}")
+                        appendLine("Apercu 200 caracteres :")
+                        append(summary.preview)
+                    }
+                },
+                onFailure = { error ->
+                    "Erreur de lecture : ${error.localizedMessage ?: error.message ?: "erreur inconnue"}"
+                }
+            )
+        }
+    }
 
     // Effet qui s'exécute quand l'écran est affiché
     DisposableEffect(Unit) {
@@ -190,6 +233,46 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                         fontSize = 35.sp,
                         fontWeight = FontWeight.Bold,
                         color = FlagGreen
+                    )
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(12.dp)
+                .widthIn(min = 220.dp, max = 420.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            Button(
+                onClick = {
+                    filePickerLauncher.launch(
+                        arrayOf(
+                            "text/*",
+                            "text/csv",
+                            "application/csv",
+                            "application/json",
+                            "text/json"
+                        )
+                    )
+                }
+            ) {
+                Text("Tester import fichier")
+            }
+
+            importSummaryText?.let { summaryText ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = summaryText,
+                    modifier = Modifier
+                        .background(Color(0xCC00334D))
+                        .padding(10.dp)
+                        .heightIn(max = 170.dp)
+                        .verticalScroll(rememberScrollState()),
+                    style = textStyle.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 )
             }
