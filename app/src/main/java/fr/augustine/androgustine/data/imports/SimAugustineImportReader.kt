@@ -117,6 +117,8 @@ private fun SimAugustineImport.toImportedCircuit(): SimAugustineImportedCircuit 
         },
         sourceLabel = "JSON Sim-Augustine",
         startStrategyIntervals = session?.startLapStrategy?.intervals.orEmpty()
+            .mapNotNull { it.toStrategyIntervalUi() },
+        raceStrategyIntervals = session?.raceLapStrategy?.intervals.orEmpty()
             .mapNotNull { it.toStrategyIntervalUi() }
     )
 }

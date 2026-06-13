@@ -141,7 +141,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                         points = uiState.circuitPoints,
                         currentLat = uiState.currentLat,
                         currentLon = uiState.currentLon,
-                        strategyIntervals = uiState.startStrategyIntervals,
+                        strategyIntervals = uiState.activeStrategyIntervals,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -244,6 +244,14 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
         ) {
             Text(
                 text = "Source circuit : ${uiState.circuitSource}",
+                style = textStyle.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Stratégie active : ${uiState.activeStrategyName}",
                 style = textStyle.copy(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium

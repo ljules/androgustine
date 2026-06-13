@@ -53,7 +53,10 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(
                     circuitPoints = points,
                     circuitSource = "CSV local",
-                    startStrategyIntervals = emptyList()
+                    activeStrategyName = "Départ",
+                    activeStrategyIntervals = emptyList(),
+                    startStrategyIntervals = emptyList(),
+                    raceStrategyIntervals = emptyList()
                 )
             } catch (e: Exception) {
                 Log.e("RaceViewModel", "CRASH lors du chargement : ${e.message}")
@@ -66,7 +69,10 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(
             circuitPoints = importedCircuit.points,
             circuitSource = importedCircuit.sourceLabel,
-            startStrategyIntervals = importedCircuit.startStrategyIntervals
+            activeStrategyName = "Départ",
+            activeStrategyIntervals = importedCircuit.startStrategyIntervals,
+            startStrategyIntervals = importedCircuit.startStrategyIntervals,
+            raceStrategyIntervals = importedCircuit.raceStrategyIntervals
         )
     }
 
@@ -134,8 +140,17 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
         if (currentLapNumber < totalLaps) {
             val nextLap = currentLapNumber + 1
+            val nextStrategyName = if (nextLap >= 2) "Course" else "Départ"
+            val nextStrategyIntervals = if (nextLap >= 2) {
+                _uiState.value.raceStrategyIntervals
+            } else {
+                _uiState.value.startStrategyIntervals
+            }
+
             _uiState.value = _uiState.value.copy(
-                lapProgress = "$nextLap/$totalLaps"
+                lapProgress = "$nextLap/$totalLaps",
+                activeStrategyName = nextStrategyName,
+                activeStrategyIntervals = nextStrategyIntervals
             )
         }
     }

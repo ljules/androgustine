@@ -172,5 +172,6 @@ data class SimAugustineImportSummary(
 data class SimAugustineImportedCircuit(
     val points: List<CircuitPoint>,
     val sourceLabel: String,
-    val startStrategyIntervals: List<StrategyIntervalUi>
+    val startStrategyIntervals: List<StrategyIntervalUi>,
+    val raceStrategyIntervals: List<StrategyIntervalUi>
 )
