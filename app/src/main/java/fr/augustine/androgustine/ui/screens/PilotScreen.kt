@@ -64,6 +64,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                 }
             }.fold(
                 onSuccess = { summary ->
+                    viewModel.useImportedCircuitIfAvailable()
                     summary.toDisplayText()
                 },
                 onFailure = { error ->
@@ -240,6 +241,14 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                 .widthIn(min = 220.dp, max = 420.dp),
             horizontalAlignment = Alignment.End
         ) {
+            Text(
+                text = "Source circuit : ${uiState.circuitSource}",
+                style = textStyle.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            )
+            Spacer(Modifier.height(6.dp))
             Button(
                 onClick = {
                     filePickerLauncher.launch(
@@ -275,6 +284,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
 
 private fun SimAugustineImportSummary.toDisplayText(): String = buildString {
     appendLine("Schema : $schemaVersion")
+    appendLine("Source circuit : $circuitSource")
     appendLine("Circuit : $circuitName")
     appendLine("Distance circuit : ${formatNumber(circuitDistanceM)} m")
     appendLine("Points circuit : $circuitPointCount")

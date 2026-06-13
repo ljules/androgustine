@@ -2,6 +2,7 @@ package fr.augustine.androgustine.data.imports
 
 import android.content.ContentResolver
 import android.net.Uri
+import fr.augustine.androgustine.data.CircuitPoint
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -42,12 +43,15 @@ fun readSimAugustineImport(contentResolver: ContentResolver, uri: Uri): SimAugus
         )
     }
 
-    val summary = sessionImport.toSummary()
-    SimAugustineImportRepository.save(sessionImport)
+    val importedCircuit = sessionImport.toImportedCircuit()
+    val summary = sessionImport.toSummary(importedCircuit)
+    SimAugustineImportRepository.save(sessionImport, importedCircuit)
     return summary
 }
 
-private fun SimAugustineImport.toSummary(): SimAugustineImportSummary {
+private fun SimAugustineImport.toSummary(
+    importedCircuit: SimAugustineImportedCircuit
+): SimAugustineImportSummary {
     val schemaVersion = requireText(schemaVersion, "schemaVersion")
     val circuit = requireBlock(circuit, "circuit")
     val session = requireBlock(session, "session")
@@ -79,6 +83,7 @@ private fun SimAugustineImport.toSummary(): SimAugustineImportSummary {
         circuitName = circuitName,
         circuitDistanceM = circuitDistanceM,
         circuitPointCount = circuitPoints.size,
+        circuitSource = importedCircuit.sourceLabel,
         totalLaps = totalLaps,
         remainingRaceLaps = remainingRaceLaps,
         startLapTimeS = requireValue(startLapResult.timeS, "simulation.startLapResult.totalTimeS"),
@@ -88,6 +93,35 @@ private fun SimAugustineImport.toSummary(): SimAugustineImportSummary {
         raceGhostPointCount = raceGhost.size,
         startStrategyIntervalCount = session.startLapStrategy?.intervals?.size ?: 0,
         raceStrategyIntervalCount = session.raceLapStrategy?.intervals?.size ?: 0
+    )
+}
+
+private fun SimAugustineImport.toImportedCircuit(): SimAugustineImportedCircuit {
+    val circuit = requireBlock(circuit, "circuit")
+    val points = requireList(circuit.points, "circuit.points")
+    if (points.isEmpty()) {
+        throw SimAugustineImportException("Import incomplet : circuit.points est vide.")
+    }
+
+    return SimAugustineImportedCircuit(
+        points = points.mapIndexed { index, point ->
+            point.toCircuitPoint(index)
+        },
+        sourceLabel = "JSON Sim-Augustine"
+    )
+}
+
+private fun SimAugustineCircuitPoint.toCircuitPoint(index: Int): CircuitPoint {
+    val lat = requireValue(lat, "circuit.points[$index].lat")
+    val lon = requireValue(lon, "circuit.points[$index].lon")
+
+    return CircuitPoint(
+        distance = distanceM?.toFloat() ?: 0f,
+        elevation = 0f,
+        utmX = utmX ?: lon,
+        utmY = utmY ?: lat,
+        lon = lon,
+        lat = lat
     )
 }
 

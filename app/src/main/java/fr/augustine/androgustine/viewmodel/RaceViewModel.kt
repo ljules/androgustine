@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fr.augustine.androgustine.data.CircuitManager
 import fr.augustine.androgustine.data.gps.GpsService
+import fr.augustine.androgustine.data.imports.SimAugustineImportRepository
 import fr.augustine.androgustine.data.timer.TimeService
 import fr.augustine.androgustine.model.PilotUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,11 +50,22 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val points = circuitManager.loadCircuitFromInternalStorage()
-                _uiState.value = _uiState.value.copy(circuitPoints = points)
+                _uiState.value = _uiState.value.copy(
+                    circuitPoints = points,
+                    circuitSource = "CSV local"
+                )
             } catch (e: Exception) {
                 Log.e("RaceViewModel", "CRASH lors du chargement : ${e.message}")
             }
         }
+    }
+
+    fun useImportedCircuitIfAvailable() {
+        val importedCircuit = SimAugustineImportRepository.getCurrentCircuit() ?: return
+        _uiState.value = _uiState.value.copy(
+            circuitPoints = importedCircuit.points,
+            circuitSource = importedCircuit.sourceLabel
+        )
     }
 
     private fun startGpsTracking() {

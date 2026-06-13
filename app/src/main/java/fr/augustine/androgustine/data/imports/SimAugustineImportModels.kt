@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.decodeFromJsonElement
+import fr.augustine.androgustine.data.CircuitPoint
 
 @Serializable
 data class SimAugustineImport(
@@ -147,6 +148,7 @@ data class SimAugustineImportSummary(
     val circuitName: String,
     val circuitDistanceM: Double,
     val circuitPointCount: Int,
+    val circuitSource: String,
     val totalLaps: Int,
     val remainingRaceLaps: Int,
     val startLapTimeS: Double,
@@ -156,4 +158,9 @@ data class SimAugustineImportSummary(
     val raceGhostPointCount: Int,
     val startStrategyIntervalCount: Int,
     val raceStrategyIntervalCount: Int
+)
+
+data class SimAugustineImportedCircuit(
+    val points: List<CircuitPoint>,
+    val sourceLabel: String
 )
