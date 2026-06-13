@@ -106,10 +106,14 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun checkLapDetection(currentLat: Double, currentLon: Double) {
+        val startFinishPoint = _uiState.value.circuitPoints.firstOrNull()
+        val targetLat = startFinishPoint?.lat ?: FINISH_LINE_LAT
+        val targetLon = startFinishPoint?.lon ?: FINISH_LINE_LON
+
         val results = FloatArray(1)
         Location.distanceBetween(
             currentLat, currentLon,
-            FINISH_LINE_LAT, FINISH_LINE_LON,
+            targetLat, targetLon,
             results
         )
 
