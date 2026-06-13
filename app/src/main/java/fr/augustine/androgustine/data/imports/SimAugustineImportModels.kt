@@ -37,10 +37,12 @@ data class SimAugustineCircuit(
     val points: List<SimAugustineCircuitPoint>? = null
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class SimAugustineCircuitPoint(
     val lat: Double? = null,
     val lon: Double? = null,
+    @JsonNames("sM")
     val distanceM: Double? = null,
     val utmX: Double? = null,
     val utmY: Double? = null
@@ -160,7 +162,11 @@ data class SimAugustineImportSummary(
     val startStrategyIntervalCount: Int,
     val raceStrategyIntervalCount: Int,
     val displayedStrategyName: String?,
-    val displayedStrategyIntervalCount: Int
+    val displayedStrategyIntervalCount: Int,
+    val firstCanvasPointDistanceM: Float,
+    val lastCanvasPointDistanceM: Float,
+    val minCanvasPointDistanceM: Float,
+    val maxCanvasPointDistanceM: Float
 )
 
 data class SimAugustineImportedCircuit(

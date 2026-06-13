@@ -68,6 +68,7 @@ private fun SimAugustineImport.toSummary(
     val sessionResult = requireBlock(simulation.sessionResult, "simulation.sessionResult")
     val startGhost = requireList(ghost.startLap, "ghost.startLap")
     val raceGhost = requireList(ghost.raceLap, "ghost.raceLap")
+    val canvasDistances = importedCircuit.points.map { it.distance }
 
     if (circuitPoints.isEmpty()) {
         throw SimAugustineImportException("Import incomplet : circuit.points est vide.")
@@ -95,7 +96,11 @@ private fun SimAugustineImport.toSummary(
         startStrategyIntervalCount = session.startLapStrategy?.intervals?.size ?: 0,
         raceStrategyIntervalCount = session.raceLapStrategy?.intervals?.size ?: 0,
         displayedStrategyName = "tour depart",
-        displayedStrategyIntervalCount = importedCircuit.startStrategyIntervals.size
+        displayedStrategyIntervalCount = importedCircuit.startStrategyIntervals.size,
+        firstCanvasPointDistanceM = importedCircuit.points.first().distance,
+        lastCanvasPointDistanceM = importedCircuit.points.last().distance,
+        minCanvasPointDistanceM = canvasDistances.minOrNull() ?: 0f,
+        maxCanvasPointDistanceM = canvasDistances.maxOrNull() ?: 0f
     )
 }
 
@@ -121,7 +126,7 @@ private fun SimAugustineCircuitPoint.toCircuitPoint(index: Int): CircuitPoint {
     val lon = requireValue(lon, "circuit.points[$index].lon")
 
     return CircuitPoint(
-        distance = distanceM?.toFloat() ?: 0f,
+        distance = requireValue(distanceM, "circuit.points[$index].sM").toFloat(),
         elevation = 0f,
         utmX = utmX ?: lon,
         utmY = utmY ?: lat,
