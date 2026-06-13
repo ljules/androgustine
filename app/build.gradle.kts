@@ -5,13 +5,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.teamaugustineapp"
+    namespace = "fr.augustine.androgustine"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "com.example.teamaugustineapp"
+        applicationId = "fr.augustine.androgustine"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
