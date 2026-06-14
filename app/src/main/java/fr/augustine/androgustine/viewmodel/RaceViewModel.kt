@@ -29,7 +29,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
     private var isTimerRunning = false
     private var lastLapTimestamp = 0L
-    private var currentLapStartedAtMs = 0L
+    private var lapStartTimeMs = 0L
 
     // CONFIGURATION DE LA COURSE
     companion object {
@@ -119,7 +119,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         isTimerRunning = true
         val now = System.currentTimeMillis()
         lastLapTimestamp = now // Le chrono commence, le tour 1 aussi
-        currentLapStartedAtMs = now
+        lapStartTimeMs = now
         viewModelScope.launch {
             timeService.timerFlow().collect { seconds ->
                 _uiState.value = _uiState.value.copy(
@@ -148,11 +148,11 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         // Si on est dans la zone et que le délai de sécurité est passé
         if (distanceToLine < LAP_DISTANCE_THRESHOLD && (currentTime - lastLapTimestamp) > LAP_THRESHOLD_MS) {
             lastLapTimestamp = currentTime
-            incrementLap()
+            incrementLap(currentTime)
         }
     }
 
-    private fun incrementLap() {
+    private fun incrementLap(lapStartTime: Long) {
         val parts = _uiState.value.lapProgress.split("/")
         val currentLapNumber = parts[0].toIntOrNull() ?: 1
         val totalLaps = parts.getOrNull(1)?.toIntOrNull() ?: 11
@@ -171,13 +171,13 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 activeStrategyName = nextStrategyName,
                 activeStrategyIntervals = nextStrategyIntervals
             )
-            currentLapStartedAtMs = System.currentTimeMillis()
+            lapStartTimeMs = lapStartTime
             updateGhostPosition()
         }
     }
 
     private fun updateGhostPosition() {
-        if (!isTimerRunning || currentLapStartedAtMs == 0L) {
+        if (!isTimerRunning || lapStartTimeMs == 0L) {
             clearGhostPosition()
             return
         }
@@ -189,8 +189,8 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
             state.startGhostPoints
         }
 
-        val elapsedTimeS = (System.currentTimeMillis() - currentLapStartedAtMs) / 1000.0
-        val ghostPoint = interpolateGhostPoint(ghostSamples, elapsedTimeS)
+        val ghostElapsedTimeS = (System.currentTimeMillis() - lapStartTimeMs) / 1000.0
+        val ghostPoint = interpolateGhostPoint(ghostSamples, ghostElapsedTimeS)
         if (ghostPoint == null) {
             clearGhostPosition()
             return
@@ -220,12 +220,15 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun interpolateGhostPoint(samples: List<GhostPoint>, elapsedTimeS: Double): GhostPoint? {
+    private fun interpolateGhostPoint(samples: List<GhostPoint>, ghostElapsedTimeS: Double): GhostPoint? {
         if (samples.isEmpty()) return null
-        if (samples.size == 1 || elapsedTimeS <= samples.first().timeS) return samples.first()
-        if (elapsedTimeS >= samples.last().timeS) return samples.last()
+        if (samples.size == 1) return samples.first()
 
-        val nextIndex = samples.indexOfFirst { it.timeS >= elapsedTimeS }
+        val targetTimeS = samples.first().timeS + ghostElapsedTimeS
+        if (targetTimeS <= samples.first().timeS) return samples.first()
+        if (targetTimeS >= samples.last().timeS) return samples.last()
+
+        val nextIndex = samples.indexOfFirst { it.timeS >= targetTimeS }
         if (nextIndex <= 0) return samples.first()
 
         val previous = samples[nextIndex - 1]
@@ -233,9 +236,9 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         val duration = next.timeS - previous.timeS
         if (duration <= 0.0) return previous
 
-        val ratio = ((elapsedTimeS - previous.timeS) / duration).coerceIn(0.0, 1.0)
+        val ratio = ((targetTimeS - previous.timeS) / duration).coerceIn(0.0, 1.0)
         return GhostPoint(
-            timeS = elapsedTimeS,
+            timeS = targetTimeS,
             distanceM = interpolate(previous.distanceM, next.distanceM, ratio),
             utmX = interpolate(previous.utmX, next.utmX, ratio),
             utmY = interpolate(previous.utmY, next.utmY, ratio),
