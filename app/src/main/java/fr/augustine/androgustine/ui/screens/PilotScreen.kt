@@ -5,11 +5,8 @@ import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -19,21 +16,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import fr.augustine.androgustine.R
-import fr.augustine.androgustine.data.imports.SimAugustineImportSummary
 import fr.augustine.androgustine.data.imports.readSimAugustineImport
 import fr.augustine.androgustine.ui.components.CircuitView
 import fr.augustine.androgustine.ui.theme.OxaniumFontFamily
 import fr.augustine.androgustine.ui.theme.ShellGrey
 import fr.augustine.androgustine.ui.theme.ShellOrange
 import fr.augustine.androgustine.ui.theme.FlagGreen
-import fr.augustine.androgustine.ui.theme.FlagYellow
-import fr.augustine.androgustine.ui.theme.DangerRed
 import fr.augustine.androgustine.viewmodel.RaceViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -47,7 +40,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
     val context = LocalContext.current
     val contentResolver = context.contentResolver
     val coroutineScope = rememberCoroutineScope()
-    var importSummaryText by remember { mutableStateOf<String?>(null) }
+    var importMessage by remember { mutableStateOf<String?>(null) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -56,19 +49,19 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             return@rememberLauncherForActivityResult
         }
 
-        importSummaryText = "Import de la session..."
+        importMessage = "Import en cours..."
         coroutineScope.launch {
-            importSummaryText = runCatching {
+            importMessage = runCatching {
                 withContext(Dispatchers.IO) {
                     readSimAugustineImport(contentResolver, uri)
                 }
             }.fold(
-                onSuccess = { summary ->
+                onSuccess = {
                     viewModel.useImportedCircuitIfAvailable()
-                    summary.toDisplayText()
+                    null
                 },
-                onFailure = { error ->
-                    "Erreur d'import : ${error.localizedMessage ?: error.message ?: "fichier non compatible"}"
+                onFailure = {
+                    "Import impossible. Vérifie le fichier JSON."
                 }
             )
         }
@@ -86,6 +79,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val hasImportedStrategy = uiState.circuitSource == "JSON Sim-Augustine"
 
     // Style de base pour la police :
     val textStyle = androidx.compose.ui.text.TextStyle(
@@ -136,15 +130,46 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                 }
 
                 // Zone Circuit (Centre)
-                Box(modifier = Modifier.weight(1.5f).fillMaxHeight()) {
-                    CircuitView(
-                        points = uiState.circuitPoints,
-                        currentLat = uiState.currentLat,
-                        currentLon = uiState.currentLon,
-                        strategyIntervals = uiState.activeStrategyIntervals,
-                        ghostPoint = uiState.ghostPoint,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                Box(
+                    modifier = Modifier.weight(1.5f).fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (hasImportedStrategy) {
+                        CircuitView(
+                            points = uiState.circuitPoints,
+                            currentLat = uiState.currentLat,
+                            currentLon = uiState.currentLon,
+                            strategyIntervals = uiState.activeStrategyIntervals,
+                            ghostPoint = uiState.ghostPoint,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Button(
+                                onClick = {
+                                    filePickerLauncher.launch(
+                                        arrayOf(
+                                            "text/*",
+                                            "application/json",
+                                            "text/json"
+                                        )
+                                    )
+                                }
+                            ) {
+                                Text("Importer stratégie Sim-Augustine")
+                            }
+                            importMessage?.let { message ->
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    text = message,
+                                    style = textStyle.copy(
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Zone Chrono / Accélérer (Haut Droite)
@@ -244,14 +269,6 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             horizontalAlignment = Alignment.End
         ) {
             Text(
-                text = "Source circuit : ${uiState.circuitSource}",
-                style = textStyle.copy(
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
                 text = "Stratégie active : ${uiState.activeStrategyName}",
                 style = textStyle.copy(
                     fontSize = 13.sp,
@@ -276,61 +293,8 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     )
                 )
             }
-            Spacer(Modifier.height(6.dp))
-            Button(
-                onClick = {
-                    filePickerLauncher.launch(
-                        arrayOf(
-                            "text/*",
-                            "application/json",
-                            "text/json"
-                        )
-                    )
-                }
-            ) {
-                Text("Tester import fichier")
-            }
-
-            importSummaryText?.let { summaryText ->
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = summaryText,
-                    modifier = Modifier
-                        .background(Color(0xCC00334D))
-                        .padding(10.dp)
-                        .heightIn(max = 170.dp)
-                        .verticalScroll(rememberScrollState()),
-                    style = textStyle.copy(
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-            }
         }
     }
-}
-
-private fun SimAugustineImportSummary.toDisplayText(): String = buildString {
-    appendLine("Schema : $schemaVersion")
-    appendLine("Source circuit : $circuitSource")
-    appendLine("Circuit : $circuitName")
-    appendLine("Distance circuit : ${formatNumber(circuitDistanceM)} m")
-    appendLine("Points circuit : $circuitPointCount")
-    appendLine("Tours total : $totalLaps")
-    appendLine("Tours course restants : $remainingRaceLaps")
-    appendLine("Temps tour depart : ${formatNumber(startLapTimeS)} s")
-    appendLine("Temps tour course : ${formatNumber(raceLapTimeS)} s")
-    appendLine("Energie session : ${formatNumber(sessionEnergyJ)} J")
-    appendLine("Strategie affichee : ${displayedStrategyName ?: "aucune"}")
-    appendLine("Intervalles affiches : $displayedStrategyIntervalCount")
-    appendLine("Distance premier point : ${formatNumber(firstCanvasPointDistanceM.toDouble())} m")
-    appendLine("Distance dernier point : ${formatNumber(lastCanvasPointDistanceM.toDouble())} m")
-    appendLine("Distance min Canvas : ${formatNumber(minCanvasPointDistanceM.toDouble())} m")
-    appendLine("Distance max Canvas : ${formatNumber(maxCanvasPointDistanceM.toDouble())} m")
-    appendLine("Intervalles depart : $startStrategyIntervalCount")
-    appendLine("Intervalles course : $raceStrategyIntervalCount")
-    appendLine("Points ghost depart : $startGhostPointCount")
-    append("Points ghost course : $raceGhostPointCount")
 }
 
 private fun formatNumber(value: Double): String =
