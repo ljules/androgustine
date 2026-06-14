@@ -10,12 +10,17 @@ import fr.augustine.androgustine.data.CircuitPoint
 import fr.augustine.androgustine.data.GhostPoint
 import fr.augustine.androgustine.data.gps.GpsService
 import fr.augustine.androgustine.data.imports.SimAugustineImportRepository
+import fr.augustine.androgustine.data.logging.SessionCsvLogRow
+import fr.augustine.androgustine.data.logging.SessionCsvLogger
 import fr.augustine.androgustine.data.timer.TimeService
 import fr.augustine.androgustine.model.PilotUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -23,11 +28,13 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     // On passe 'application' (qui est un Context) au manager
     private val circuitManager = CircuitManager(application)
     private val timeService = TimeService()
+    private val sessionLogger = SessionCsvLogger(application)
 
     private val _uiState = MutableStateFlow(PilotUiState())
     val uiState: StateFlow<PilotUiState> = _uiState.asStateFlow()
 
     private var isTimerRunning = false
+    private var sessionStartTimeMs = 0L
     private var lastLapTimestamp = 0L
     private var lapStartTimeMs = 0L
 
@@ -40,6 +47,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         // Coordonnées de la ligne (À MODIFIER avec vos coordonnées réelles)
         private const val FINISH_LINE_LAT = 48.564144
         private const val FINISH_LINE_LON = 2.782492
+        private val isoTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
     }
 
     init {
@@ -110,6 +118,8 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 // 3. Vérification du franchissement de ligne
                 if (isTimerRunning) {
                     checkLapDetection(gpsData.latitude, gpsData.longitude)
+                    updateGhostPosition()
+                    writeSessionLog(gpsData.latitude, gpsData.longitude, gpsData.speed)
                 }
             }
         }
@@ -118,8 +128,10 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private fun startRaceTimer() {
         isTimerRunning = true
         val now = System.currentTimeMillis()
+        sessionStartTimeMs = now
         lastLapTimestamp = now // Le chrono commence, le tour 1 aussi
         lapStartTimeMs = now
+        sessionLogger.startSession(now)
         viewModelScope.launch {
             timeService.timerFlow().collect { seconds ->
                 _uiState.value = _uiState.value.copy(
@@ -262,6 +274,39 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun getCurrentLapNumber(state: PilotUiState): Int =
         state.lapProgress.substringBefore("/").toIntOrNull() ?: 1
+
+    private fun writeSessionLog(currentLat: Double, currentLon: Double, speedKmh: Float) {
+        if (sessionStartTimeMs == 0L || lapStartTimeMs == 0L) return
+
+        val now = System.currentTimeMillis()
+        val state = _uiState.value
+        val snappedDistanceM = findNearestCircuitDistance(
+            state.circuitPoints,
+            currentLat,
+            currentLon
+        )
+
+        sessionLogger.write(
+            SessionCsvLogRow(
+                timestampIso = isoTimestamp.format(Date(now)),
+                elapsedSessionS = (now - sessionStartTimeMs) / 1000.0,
+                elapsedLapS = (now - lapStartTimeMs) / 1000.0,
+                currentLap = getCurrentLapNumber(state),
+                activeStrategy = state.activeStrategyName,
+                gpsLat = currentLat,
+                gpsLon = currentLon,
+                gpsSpeedKmh = speedKmh,
+                snappedDistanceM = snappedDistanceM,
+                ghostDistanceM = state.ghostDistanceM,
+                deltaDistanceM = state.ghostDeltaDistanceM
+            )
+        )
+    }
+
+    override fun onCleared() {
+        sessionLogger.stopSession()
+        super.onCleared()
+    }
 
     private fun interpolate(start: Float, end: Float, ratio: Double): Float =
         (start + ((end - start) * ratio)).toFloat()
