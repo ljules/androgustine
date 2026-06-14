@@ -15,10 +15,12 @@ import java.net.URL
 import java.util.Locale
 
 class WeatherService {
-    suspend fun fetchCurrentWeather(latitude: Double, longitude: Double): WeatherSnapshot? =
+    suspend fun fetchCurrentWeather(latitude: Double, longitude: Double): WeatherFetchResult =
         withContext(Dispatchers.IO) {
             runCatching {
-                val url = URL(buildForecastUrl(latitude, longitude))
+                val forecastUrl = buildForecastUrl(latitude, longitude)
+                Log.i(TAG, "Open-Meteo URL: $forecastUrl")
+                val url = URL(forecastUrl)
                 val connection = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     connectTimeout = 5000
@@ -26,18 +28,41 @@ class WeatherService {
                 }
 
                 try {
-                    if (connection.responseCode in 200..299) {
-                        val body = connection.inputStream.bufferedReader().use { it.readText() }
-                        parseWeather(body)
+                    val httpCode = connection.responseCode
+                    Log.i(TAG, "Open-Meteo HTTP code: $httpCode")
+
+                    val body = if (httpCode in 200..299) {
+                        connection.inputStream.bufferedReader().use { it.readText() }
                     } else {
-                        null
+                        connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    }
+
+                    if (body.isNotBlank()) {
+                        Log.d(TAG, "Open-Meteo body start: ${body.take(BODY_LOG_LIMIT)}")
+                    }
+
+                    if (httpCode in 200..299) {
+                        parseWeather(body)?.let { WeatherFetchResult.Success(it) }
+                            ?: WeatherFetchResult.Failure("Missing or invalid weather fields").also {
+                                Log.w(TAG, "Open-Meteo error: ${it.message}")
+                            }
+                    } else {
+                        WeatherFetchResult.Failure("HTTP $httpCode: ${body.take(BODY_LOG_LIMIT)}").also {
+                            Log.w(TAG, "Open-Meteo error: ${it.message}")
+                        }
                     }
                 } finally {
                     connection.disconnect()
                 }
             }.onFailure { error ->
-                Log.w(TAG, "Weather fetch failed: ${error.message}")
-            }.getOrNull()
+                Log.e(
+                    TAG,
+                    "Open-Meteo error: ${error::class.java.simpleName}: ${error.message}",
+                    error
+                )
+            }.getOrElse { error ->
+                WeatherFetchResult.Failure("${error::class.java.simpleName}: ${error.message}")
+            }
         }
 
     private fun buildForecastUrl(latitude: Double, longitude: Double): String =
@@ -77,8 +102,14 @@ class WeatherService {
 
     private companion object {
         private const val TAG = "WeatherService"
+        private const val BODY_LOG_LIMIT = 500
         private val json = Json { ignoreUnknownKeys = true }
     }
+}
+
+sealed class WeatherFetchResult {
+    data class Success(val snapshot: WeatherSnapshot) : WeatherFetchResult()
+    data class Failure(val message: String) : WeatherFetchResult()
 }
 
 data class WeatherSnapshot(

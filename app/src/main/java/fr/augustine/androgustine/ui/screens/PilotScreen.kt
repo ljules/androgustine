@@ -291,6 +291,14 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     fontWeight = FontWeight.Medium
                 )
             )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = uiState.weatherStatusMessage,
+                style = textStyle.copy(
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            )
             uiState.ghostDeltaDistanceM?.let { delta ->
                 Spacer(Modifier.height(4.dp))
                 Text(

@@ -13,6 +13,7 @@ import fr.augustine.androgustine.data.imports.SimAugustineImportRepository
 import fr.augustine.androgustine.data.logging.SessionCsvLogRow
 import fr.augustine.androgustine.data.logging.SessionCsvLogger
 import fr.augustine.androgustine.data.timer.TimeService
+import fr.augustine.androgustine.data.weather.WeatherFetchResult
 import fr.augustine.androgustine.data.weather.WeatherService
 import fr.augustine.androgustine.model.PilotUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +49,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         private const val LAP_DISTANCE_THRESHOLD = 20f // mètres autour de la ligne
         private const val LAP_THRESHOLD_MS = 30000L    // 30s min entre deux tours (anti-rebond)
         private const val WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000L
+        private const val WEATHER_RETRY_AFTER_ERROR_MS = 30 * 1000L
 
         // Coordonnées de la ligne (À MODIFIER avec vos coordonnées réelles)
         private const val FINISH_LINE_LAT = 48.564144
@@ -114,6 +116,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                     currentLat = gpsData.latitude,
                     currentLon = gpsData.longitude
                 )
+                maybeRefreshWeather(gpsData.latitude, gpsData.longitude)
 
                 // 2. Déclenchement automatique du chrono au départ
                 if (!isTimerRunning && gpsData.speed > START_SPEED_THRESHOLD) {
@@ -123,7 +126,6 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 // 3. Vérification du franchissement de ligne
                 if (isTimerRunning) {
                     checkLapDetection(gpsData.latitude, gpsData.longitude)
-                    maybeRefreshWeather(gpsData.latitude, gpsData.longitude)
                     updateGhostPosition()
                     writeSessionLog(gpsData.latitude, gpsData.longitude, gpsData.speed)
                 }
@@ -313,23 +315,41 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun maybeRefreshWeather(latitude: Double, longitude: Double) {
+        if (!latitude.isFinite() || !longitude.isFinite() || (latitude == 0.0 && longitude == 0.0)) {
+            _uiState.value = _uiState.value.copy(weatherStatusMessage = "Meteo : attente GPS")
+            return
+        }
+
         val now = System.currentTimeMillis()
         if (isWeatherFetchRunning) return
-        if (lastWeatherFetchAttemptMs != 0L && now - lastWeatherFetchAttemptMs < WEATHER_REFRESH_INTERVAL_MS) {
+        val refreshIntervalMs = if (_uiState.value.weatherStatusMessage == "Meteo : OK") {
+            WEATHER_REFRESH_INTERVAL_MS
+        } else {
+            WEATHER_RETRY_AFTER_ERROR_MS
+        }
+        if (lastWeatherFetchAttemptMs != 0L && now - lastWeatherFetchAttemptMs < refreshIntervalMs) {
             return
         }
 
         lastWeatherFetchAttemptMs = now
         isWeatherFetchRunning = true
+        _uiState.value = _uiState.value.copy(weatherStatusMessage = "Meteo : requête en cours")
         viewModelScope.launch {
             try {
-                val weather = weatherService.fetchCurrentWeather(latitude, longitude)
-                if (weather != null) {
-                    _uiState.value = _uiState.value.copy(
-                        weatherTemperatureC = weather.temperatureC,
-                        weatherWindKmh = weather.windKmh,
-                        weatherRainProbability = weather.rainProbability
-                    )
+                when (val result = weatherService.fetchCurrentWeather(latitude, longitude)) {
+                    is WeatherFetchResult.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            weatherTemperatureC = result.snapshot.temperatureC,
+                            weatherWindKmh = result.snapshot.windKmh,
+                            weatherRainProbability = result.snapshot.rainProbability,
+                            weatherStatusMessage = "Meteo : OK"
+                        )
+                    }
+
+                    is WeatherFetchResult.Failure -> {
+                        Log.w("RaceViewModel", "Weather fetch failed: ${result.message}")
+                        _uiState.value = _uiState.value.copy(weatherStatusMessage = "Meteo : erreur réseau")
+                    }
                 }
             } finally {
                 isWeatherFetchRunning = false
