@@ -283,6 +283,14 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     fontWeight = FontWeight.Medium
                 )
             )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Meteo : ${formatNullable(uiState.weatherTemperatureC)} C | vent ${formatNullable(uiState.weatherWindKmh)} km/h | pluie ${uiState.weatherRainProbability?.toString() ?: "--"}%",
+                style = textStyle.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            )
             uiState.ghostDeltaDistanceM?.let { delta ->
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -299,3 +307,6 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
 
 private fun formatNumber(value: Double): String =
     String.format(Locale.US, "%.2f", value)
+
+private fun formatNullable(value: Float?): String =
+    value?.let { String.format(Locale.US, "%.1f", it) } ?: "--"

@@ -85,9 +85,9 @@ class SessionCsvLogger(private val context: Context) {
         snappedDistanceM?.formatFloat().orEmpty(),
         ghostDistanceM?.formatFloat().orEmpty(),
         deltaDistanceM?.formatFloat().orEmpty(),
-        "",
-        "",
-        "",
+        weatherTemperatureC?.formatFloat().orEmpty(),
+        weatherWindKmh?.formatFloat().orEmpty(),
+        weatherRainProbability?.toString().orEmpty(),
         "",
         "",
         "",
@@ -118,7 +118,10 @@ data class SessionCsvLogRow(
     val gpsSpeedKmh: Float,
     val snappedDistanceM: Float?,
     val ghostDistanceM: Float?,
-    val deltaDistanceM: Float?
+    val deltaDistanceM: Float?,
+    val weatherTemperatureC: Float?,
+    val weatherWindKmh: Float?,
+    val weatherRainProbability: Int?
 )
 
 private fun String.escapeCsv(): String {

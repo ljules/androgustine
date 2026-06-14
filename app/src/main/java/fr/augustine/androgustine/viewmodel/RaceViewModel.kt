@@ -13,6 +13,7 @@ import fr.augustine.androgustine.data.imports.SimAugustineImportRepository
 import fr.augustine.androgustine.data.logging.SessionCsvLogRow
 import fr.augustine.androgustine.data.logging.SessionCsvLogger
 import fr.augustine.androgustine.data.timer.TimeService
+import fr.augustine.androgustine.data.weather.WeatherService
 import fr.augustine.androgustine.model.PilotUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private val circuitManager = CircuitManager(application)
     private val timeService = TimeService()
     private val sessionLogger = SessionCsvLogger(application)
+    private val weatherService = WeatherService()
 
     private val _uiState = MutableStateFlow(PilotUiState())
     val uiState: StateFlow<PilotUiState> = _uiState.asStateFlow()
@@ -37,12 +39,15 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private var sessionStartTimeMs = 0L
     private var lastLapTimestamp = 0L
     private var lapStartTimeMs = 0L
+    private var lastWeatherFetchAttemptMs = 0L
+    private var isWeatherFetchRunning = false
 
     // CONFIGURATION DE LA COURSE
     companion object {
         private const val START_SPEED_THRESHOLD = 8.0f // km/h pour lancer le chrono
         private const val LAP_DISTANCE_THRESHOLD = 20f // mètres autour de la ligne
         private const val LAP_THRESHOLD_MS = 30000L    // 30s min entre deux tours (anti-rebond)
+        private const val WEATHER_REFRESH_INTERVAL_MS = 5 * 60 * 1000L
 
         // Coordonnées de la ligne (À MODIFIER avec vos coordonnées réelles)
         private const val FINISH_LINE_LAT = 48.564144
@@ -118,6 +123,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 // 3. Vérification du franchissement de ligne
                 if (isTimerRunning) {
                     checkLapDetection(gpsData.latitude, gpsData.longitude)
+                    maybeRefreshWeather(gpsData.latitude, gpsData.longitude)
                     updateGhostPosition()
                     writeSessionLog(gpsData.latitude, gpsData.longitude, gpsData.speed)
                 }
@@ -298,9 +304,37 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 gpsSpeedKmh = speedKmh,
                 snappedDistanceM = snappedDistanceM,
                 ghostDistanceM = state.ghostDistanceM,
-                deltaDistanceM = state.ghostDeltaDistanceM
+                deltaDistanceM = state.ghostDeltaDistanceM,
+                weatherTemperatureC = state.weatherTemperatureC,
+                weatherWindKmh = state.weatherWindKmh,
+                weatherRainProbability = state.weatherRainProbability
             )
         )
+    }
+
+    private fun maybeRefreshWeather(latitude: Double, longitude: Double) {
+        val now = System.currentTimeMillis()
+        if (isWeatherFetchRunning) return
+        if (lastWeatherFetchAttemptMs != 0L && now - lastWeatherFetchAttemptMs < WEATHER_REFRESH_INTERVAL_MS) {
+            return
+        }
+
+        lastWeatherFetchAttemptMs = now
+        isWeatherFetchRunning = true
+        viewModelScope.launch {
+            try {
+                val weather = weatherService.fetchCurrentWeather(latitude, longitude)
+                if (weather != null) {
+                    _uiState.value = _uiState.value.copy(
+                        weatherTemperatureC = weather.temperatureC,
+                        weatherWindKmh = weather.windKmh,
+                        weatherRainProbability = weather.rainProbability
+                    )
+                }
+            } finally {
+                isWeatherFetchRunning = false
+            }
+        }
     }
 
     override fun onCleared() {
