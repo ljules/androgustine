@@ -24,6 +24,7 @@ data class PilotUiState(
     val weatherWindKmh: Float? = null,
     val weatherRainProbability: Int? = null,
     val weatherStatusMessage: String = "Meteo : attente GPS",
+    val heartRateBpm: Int? = null,
     val currentLat: Double = 0.0,
     val currentLon: Double = 0.0,
     val instruction: String = "MAINTENIR",

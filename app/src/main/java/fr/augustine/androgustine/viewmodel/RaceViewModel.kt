@@ -5,6 +5,7 @@ import android.location.Location
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import fr.augustine.androgustine.data.ble.HeartRateBleManager
 import fr.augustine.androgustine.data.CircuitManager
 import fr.augustine.androgustine.data.CircuitPoint
 import fr.augustine.androgustine.data.GhostPoint
@@ -19,6 +20,7 @@ import fr.augustine.androgustine.model.PilotUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -32,6 +34,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private val timeService = TimeService()
     private val sessionLogger = SessionCsvLogger(application)
     private val weatherService = WeatherService()
+    private val heartRateBleManager = HeartRateBleManager(application)
 
     private val _uiState = MutableStateFlow(PilotUiState())
     val uiState: StateFlow<PilotUiState> = _uiState.asStateFlow()
@@ -42,6 +45,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private var lapStartTimeMs = 0L
     private var lastWeatherFetchAttemptMs = 0L
     private var isWeatherFetchRunning = false
+    private var heartRateJob: Job? = null
 
     // CONFIGURATION DE LA COURSE
     companion object {
@@ -62,6 +66,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         loadCircuitData()
         // Démarrage du flux GPS
         startGpsTracking()
+        startHeartRateTracking()
     }
 
     private fun loadCircuitData() {
@@ -309,9 +314,20 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 deltaDistanceM = state.ghostDeltaDistanceM,
                 weatherTemperatureC = state.weatherTemperatureC,
                 weatherWindKmh = state.weatherWindKmh,
-                weatherRainProbability = state.weatherRainProbability
+                weatherRainProbability = state.weatherRainProbability,
+                heartRateBpm = state.heartRateBpm
             )
         )
+    }
+
+    fun startHeartRateTracking() {
+        if (heartRateJob?.isActive == true) return
+
+        heartRateJob = viewModelScope.launch {
+            heartRateBleManager.heartRateFlow().collect { bpm ->
+                _uiState.value = _uiState.value.copy(heartRateBpm = bpm)
+            }
+        }
     }
 
     private fun maybeRefreshWeather(latitude: Double, longitude: Double) {

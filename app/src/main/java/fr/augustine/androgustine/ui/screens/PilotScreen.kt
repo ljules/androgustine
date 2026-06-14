@@ -1,6 +1,8 @@
 package fr.augustine.androgustine.ui.screens
 
+import android.Manifest
 import android.app.Activity
+import android.os.Build
 import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,6 +43,15 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
     val contentResolver = context.contentResolver
     val coroutineScope = rememberCoroutineScope()
     var importMessage by remember { mutableStateOf<String?>(null) }
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        viewModel.startHeartRateTracking()
+    }
+
+    LaunchedEffect(Unit) {
+        bluetoothPermissionLauncher.launch(requiredBluetoothPermissions())
+    }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -285,6 +296,14 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             )
             Spacer(Modifier.height(4.dp))
             Text(
+                text = "FC : ${uiState.heartRateBpm?.toString() ?: "--"} bpm",
+                style = textStyle.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
                 text = "Meteo : ${formatNullable(uiState.weatherTemperatureC)} C | vent ${formatNullable(uiState.weatherWindKmh)} km/h | pluie ${uiState.weatherRainProbability?.toString() ?: "--"}%",
                 style = textStyle.copy(
                     fontSize = 13.sp,
@@ -318,3 +337,13 @@ private fun formatNumber(value: Double): String =
 
 private fun formatNullable(value: Float?): String =
     value?.let { String.format(Locale.US, "%.1f", it) } ?: "--"
+
+private fun requiredBluetoothPermissions(): Array<String> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT
+        )
+    } else {
+        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
