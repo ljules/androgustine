@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration.Companion.Underline
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -102,7 +103,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
 
         // Fond d'écran avec tachymètre
         Image(
-            painter = painterResource(id = R.drawable.background_landscape),
+            painter = painterResource(id = R.drawable.background_landscape_dark),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
@@ -122,7 +123,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                         Image(painterResource(R.drawable.ico_loop), null, Modifier.size(38.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = uiState.lapProgress,
+                            text = uiState.lapProgress, //TODO : Vérifier que le nombre de tours total vient de la variable totalLaps mis à jour avec le JSON.
                             style= textStyle.copy(
                                 fontSize = 32.sp,
                                 fontWeight = FontWeight.Bold
@@ -130,6 +131,8 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                             )
                     }
                     Spacer(Modifier.height(10.dp))
+                    // TODO : Conditionner l'affichage de l'image ico_stands et du texte stands selon l'état de pitStopRequest,
+                    // si true afficher icône et le texte, sinon ne rien afficher.
                     Image(painterResource(R.drawable.ico_stands), null, Modifier.size(60.dp))
                     Text(
                         text = "stands",
@@ -203,6 +206,8 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     Spacer(Modifier.height(8.dp))
                     Image(painterResource(R.drawable.ico_speed_meter), null, Modifier.size(60.dp))
                     Text(
+                        // TODO: Le texte doit prendre la valeur et la couleur dépend de la variable PilotPaceInstruction :
+                        //  "accélérer" en rouge si ACCELERATE, "maintenir" en vert si MAINTAIN, "ralentir" en bleu si SLOW_DOWN
                         text = "accélérer",
                         style = textStyle.copy(
                             fontSize = 32.sp,
@@ -213,43 +218,112 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             }
 
             // --- LIGNE 2 (Vitesse Centrale) ---
-            Box(modifier = Modifier.weight(0.4f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Row(verticalAlignment = Alignment.Bottom) {
+            // TODO : Découper en 3  colonnes, colonne 1 en 3 lignes info météo, colonne 2 vitesse, colone 3 en 2 lignes rythme cardiaque
+            Row() {
+                // Colonne des infos météo :
+                Column(
+                    modifier = Modifier
+                        .weight(0.3f)
+                        .padding(start = 10.dp),
+                    horizontalAlignment = Alignment.Start,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    // Entête météo
                     Text(
-                        text = "%.0f".format(uiState.speed),
+                        text = "Météo ☀ :",
                         style = textStyle.copy(
-                            fontSize = 130.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = (-2).sp
+                            color = ShellOrange,
+                            textDecoration = Underline,
                         )
                     )
-                    Column(Modifier.padding(bottom = 20.dp, start = 8.dp)) {
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Valeurs météo :
+                    Column(
+                        modifier = Modifier.padding(start = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
                         Text(
-                            text = "(vit. GPS)",
-                            color = ShellGrey,
+                            text = "🌡 ${formatNullable(uiState.weatherTemperatureC)} °C",
                             style = textStyle.copy(
                                 fontSize = 18.sp,
-                                fontWeight = FontWeight.Normal
+                                fontWeight = FontWeight.Medium
                             )
                         )
+
                         Text(
-                            text = "km/h",
-                            color = ShellOrange,
+                            text = " \uD83D\uDCA8 ${formatNullable(uiState.weatherWindKmh)} km/h",
                             style = textStyle.copy(
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+
+                        Text(
+                            text = "💧  ${uiState.weatherRainProbability?.toString() ?: "--"}%",
+                            style = textStyle.copy(
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         )
                     }
                 }
+
+                // Colonne de la vitesse :
+//                Column(
+//
+//                ) {
+                    Box(
+                        modifier = Modifier.weight(0.4f).fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = "%.0f".format(uiState.speed),
+                                style = textStyle.copy(
+                                    fontSize = 130.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = (-2).sp
+                                )
+                            )
+                            Column(Modifier.padding(bottom = 20.dp, start = 8.dp)) {
+                                Text(
+                                    text = "(vit. GPS)",
+                                    color = ShellGrey,
+                                    style = textStyle.copy(
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Normal
+                                    )
+                                )
+                                Text(
+                                    text = "km/h",
+                                    color = ShellOrange,
+                                    style = textStyle.copy(
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
+                        }
+                    }
+                //}
+
+                // Colonne de la fréquence cardiaque :
+                //Column(){}
             }
 
             // --- LIGNE 3 (Drapeaux / Instructions) ---
+            // TODO: Découper en 3 colonnes : A gauche la consommation, au centre le statut de course avec les icônes des drapeaux, à droite info de l'application
             Row(
                 modifier = Modifier.weight(0.2f).fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
+                // TODO: Vérifier que l'affichage des drapeaux est bien conditionné à la variable raceStatusInstruction:
+                // Si RACE alors ico_on_track, si NO_OVERTAKING alors flag_yellow et si STOP alors flag_red
                 Image(
                     //painter = painterResource(id = if (uiState.flag == "jaune") R.drawable.flag_yellow else R.drawable.flag_red),
                     painter = painterResource(id = when (uiState.flag) {
@@ -294,6 +368,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     fontWeight = FontWeight.Medium
                 )
             )
+            // TODO: Déplacer la fréquence cardiaque dans sa zone dédiée :
             Spacer(Modifier.height(4.dp))
             Text(
                 text = "FC : ${uiState.heartRateBpm?.toString() ?: "--"} bpm",
@@ -302,22 +377,8 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     fontWeight = FontWeight.Medium
                 )
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "Meteo : ${formatNullable(uiState.weatherTemperatureC)} C | vent ${formatNullable(uiState.weatherWindKmh)} km/h | pluie ${uiState.weatherRainProbability?.toString() ?: "--"}%",
-                style = textStyle.copy(
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = uiState.weatherStatusMessage,
-                style = textStyle.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            )
+
+
             uiState.ghostDeltaDistanceM?.let { delta ->
                 Spacer(Modifier.height(4.dp))
                 Text(
