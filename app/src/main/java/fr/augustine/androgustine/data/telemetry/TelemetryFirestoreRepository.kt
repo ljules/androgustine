@@ -4,6 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -16,10 +19,15 @@ class TelemetryFirestoreRepository(
     private var sessionId: String? = null
     private var lastWriteAtMs = 0L
     private var initializationAttempted = false
+    private val _status = MutableStateFlow(FirestoreStatus(enabled = enabled))
+    val status: StateFlow<FirestoreStatus> = _status.asStateFlow()
 
     fun startSession(startTimeMs: Long): String {
-        sessionId = "androgustine-session-${sessionTimestamp.format(Date(startTimeMs))}"
-        lastWriteAtMs = 0L
+        if (sessionId == null) {
+            sessionId = "androgustine-session-${sessionTimestamp.format(Date(startTimeMs))}"
+            lastWriteAtMs = 0L
+        }
+        _status.value = _status.value.copy(sessionId = sessionId)
         Log.i(TAG, "Telemetry Firestore sessionId=$sessionId")
         initializeFirestoreIfNeeded()
         return sessionId.orEmpty()
@@ -40,9 +48,20 @@ class TelemetryFirestoreRepository(
             .document("latest")
             .set(snapshot.toFirestoreMap())
             .addOnFailureListener { error ->
-                Log.w(TAG, "Telemetry Firestore write failed: ${error.message}", error)
+                val message = error.message ?: error.javaClass.simpleName
+                _status.value = _status.value.copy(
+                    errorCount = _status.value.errorCount + 1,
+                    lastError = message
+                )
+                Log.w(TAG, "Telemetry Firestore write failed: $message", error)
             }
             .addOnSuccessListener {
+                _status.value = _status.value.copy(
+                    lastSuccessEpochMs = nowMs,
+                    lastPublishedTimestampIso = snapshot.timestampIso,
+                    writeCount = _status.value.writeCount + 1,
+                    lastError = null
+                )
                 Log.d(TAG, "Telemetry Firestore latest updated for $activeSessionId")
             }
     }
@@ -58,7 +77,12 @@ class TelemetryFirestoreRepository(
                 FirebaseApp.initializeApp(context)
             }
             if (FirebaseApp.getApps(context).isEmpty()) {
-                Log.w(TAG, "Firebase is not initialized. Add app/google-services.json to enable Firestore telemetry.")
+                val message = "Firebase is not initialized. Add app/google-services.json to enable Firestore telemetry."
+                _status.value = _status.value.copy(
+                    errorCount = _status.value.errorCount + 1,
+                    lastError = message
+                )
+                Log.w(TAG, message)
                 null
             } else {
                 FirebaseFirestore.getInstance().also {
@@ -67,7 +91,12 @@ class TelemetryFirestoreRepository(
                 }
             }
         }.onFailure { error ->
-            Log.w(TAG, "Telemetry Firestore initialization failed: ${error.message}", error)
+            val message = error.message ?: error.javaClass.simpleName
+            _status.value = _status.value.copy(
+                errorCount = _status.value.errorCount + 1,
+                lastError = message
+            )
+            Log.w(TAG, "Telemetry Firestore initialization failed: $message", error)
         }.getOrNull()
     }
 

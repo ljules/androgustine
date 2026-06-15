@@ -34,6 +34,8 @@ import fr.augustine.androgustine.viewmodel.RaceViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -395,6 +397,47 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     )
                 )
             }
+
+            Spacer(Modifier.height(8.dp))
+            val firestoreStatus = uiState.firestoreStatus
+            Text(
+                text = firestoreTitle(
+                    enabled = firestoreStatus.enabled,
+                    writeCount = firestoreStatus.writeCount,
+                    lastError = firestoreStatus.lastError
+                ),
+                style = textStyle.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = firestoreColor(firestoreStatus.enabled, firestoreStatus.lastError)
+                )
+            )
+            Text(
+                text = "Session : ${firestoreStatus.sessionId ?: "--"}",
+                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            )
+            Text(
+                text = "Derniere synchro : ${formatSyncTime(firestoreStatus.lastSuccessEpochMs)}",
+                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            )
+            Text(
+                text = "Ecritures : ${firestoreStatus.writeCount}",
+                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            )
+            Text(
+                text = "Erreurs : ${firestoreStatus.errorCount}",
+                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
+            )
+            firestoreStatus.lastError?.let { error ->
+                Text(
+                    text = "Derniere erreur : $error",
+                    style = textStyle.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.Red
+                    )
+                )
+            }
         }
     }
 }
@@ -404,6 +447,24 @@ private fun formatNumber(value: Double): String =
 
 private fun formatNullable(value: Float?): String =
     value?.let { String.format(Locale.US, "%.1f", it) } ?: "--"
+
+private fun formatSyncTime(epochMs: Long?): String =
+    epochMs?.let { SimpleDateFormat("HH:mm:ss", Locale.FRANCE).format(Date(it)) } ?: "--"
+
+private fun firestoreTitle(enabled: Boolean, writeCount: Int, lastError: String?): String =
+    when {
+        !enabled -> "Firestore desactive"
+        lastError != null -> "Firestore ERROR"
+        writeCount > 0 -> "Firestore OK"
+        else -> "Firestore attente"
+    }
+
+private fun firestoreColor(enabled: Boolean, lastError: String?): Color =
+    when {
+        !enabled -> ShellGrey
+        lastError != null -> Color.Red
+        else -> FlagGreen
+    }
 
 private fun requiredBluetoothPermissions(): Array<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

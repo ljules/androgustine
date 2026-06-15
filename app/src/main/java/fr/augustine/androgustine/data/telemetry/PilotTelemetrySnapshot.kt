@@ -2,12 +2,13 @@ package fr.augustine.androgustine.data.telemetry
 
 data class PilotTelemetrySnapshot(
     val timestampIso: String,
+    val raceStarted: Boolean,
     val elapsedSessionS: Double,
     val elapsedLapS: Double,
     val currentLap: Int,
     val activeStrategy: String,
-    val gpsLat: Double,
-    val gpsLon: Double,
+    val gpsLat: Double?,
+    val gpsLon: Double?,
     val gpsSpeedKmh: Float,
     val snappedDistanceM: Float?,
     val ghostDistanceM: Float?,
@@ -19,6 +20,7 @@ data class PilotTelemetrySnapshot(
 ) {
     fun toFirestoreMap(): Map<String, Any?> = mapOf(
         "timestampIso" to timestampIso,
+        "raceStarted" to raceStarted,
         "elapsedSessionS" to elapsedSessionS,
         "elapsedLapS" to elapsedLapS,
         "currentLap" to currentLap,

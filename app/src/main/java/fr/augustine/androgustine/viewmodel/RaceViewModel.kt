@@ -65,11 +65,27 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        observeFirestoreStatus()
+        startFirestoreTelemetry()
         // Chargement du circuit au démarrage (Dossier Interne)
         loadCircuitData()
         // Démarrage du flux GPS
         startGpsTracking()
         startHeartRateTracking()
+    }
+
+    private fun observeFirestoreStatus() {
+        viewModelScope.launch {
+            telemetryFirestoreRepository.status.collect { status ->
+                _uiState.value = _uiState.value.copy(firestoreStatus = status)
+            }
+        }
+    }
+
+    private fun startFirestoreTelemetry() {
+        val now = System.currentTimeMillis()
+        telemetryFirestoreRepository.startSession(now)
+        publishWaitingFirestoreTelemetry(now)
     }
 
     private fun loadCircuitData() {
@@ -135,8 +151,14 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                     startRaceTimer()
                 }
 
-                // 3. Vérification du franchissement de ligne
-                if (isTimerRunning) {
+                if (!isTimerRunning) {
+                    publishWaitingFirestoreTelemetry(
+                        latitude = gpsData.latitude,
+                        longitude = gpsData.longitude,
+                        speedKmh = gpsData.speed
+                    )
+                } else {
+                    // 3. Vérification du franchissement de ligne
                     checkLapDetection(gpsData.latitude, gpsData.longitude)
                     updateGhostPosition()
                     writeSessionLog(gpsData.latitude, gpsData.longitude, gpsData.speed)
@@ -152,7 +174,6 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         lastLapTimestamp = now // Le chrono commence, le tour 1 aussi
         lapStartTimeMs = now
         sessionLogger.startSession(now)
-        telemetryFirestoreRepository.startSession(now)
         viewModelScope.launch {
             timeService.timerFlow().collect { seconds ->
                 _uiState.value = _uiState.value.copy(
@@ -296,6 +317,42 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private fun getCurrentLapNumber(state: PilotUiState): Int =
         state.lapProgress.substringBefore("/").toIntOrNull() ?: 1
 
+    private fun publishWaitingFirestoreTelemetry(
+        now: Long = System.currentTimeMillis(),
+        latitude: Double? = null,
+        longitude: Double? = null,
+        speedKmh: Float = _uiState.value.speed
+    ) {
+        val state = _uiState.value
+        val telemetryLat = latitude ?: state.currentLat
+        val telemetryLon = longitude ?: state.currentLon
+        val hasGpsPosition = telemetryLat.isFinite() &&
+            telemetryLon.isFinite() &&
+            !(telemetryLat == 0.0 && telemetryLon == 0.0)
+
+        telemetryFirestoreRepository.publishLatest(
+            PilotTelemetrySnapshot(
+                timestampIso = isoTimestamp.format(Date(now)),
+                raceStarted = false,
+                elapsedSessionS = 0.0,
+                elapsedLapS = 0.0,
+                currentLap = 0,
+                activeStrategy = "WAITING",
+                gpsLat = telemetryLat.takeIf { hasGpsPosition },
+                gpsLon = telemetryLon.takeIf { hasGpsPosition },
+                gpsSpeedKmh = speedKmh.takeIf { it.isFinite() } ?: 0f,
+                snappedDistanceM = null,
+                ghostDistanceM = null,
+                deltaDistanceM = null,
+                heartRateBpm = state.heartRateBpm,
+                weatherTemperatureC = state.weatherTemperatureC,
+                weatherWindKmh = state.weatherWindKmh,
+                weatherRainProbability = state.weatherRainProbability
+            ),
+            nowMs = now
+        )
+    }
+
     private fun writeSessionLog(currentLat: Double, currentLon: Double, speedKmh: Float) {
         if (sessionStartTimeMs == 0L || lapStartTimeMs == 0L) return
 
@@ -334,6 +391,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         telemetryFirestoreRepository.publishLatest(
             PilotTelemetrySnapshot(
                 timestampIso = timestampIso,
+                raceStarted = true,
                 elapsedSessionS = elapsedSessionS,
                 elapsedLapS = elapsedLapS,
                 currentLap = currentLap,
@@ -359,6 +417,9 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         heartRateJob = viewModelScope.launch {
             heartRateBleManager.heartRateFlow().collect { bpm ->
                 _uiState.value = _uiState.value.copy(heartRateBpm = bpm)
+                if (!isTimerRunning) {
+                    publishWaitingFirestoreTelemetry()
+                }
             }
         }
     }
@@ -393,6 +454,9 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                             weatherRainProbability = result.snapshot.rainProbability,
                             weatherStatusMessage = "Meteo : OK"
                         )
+                        if (!isTimerRunning) {
+                            publishWaitingFirestoreTelemetry()
+                        }
                     }
 
                     is WeatherFetchResult.Failure -> {
