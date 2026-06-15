@@ -3,7 +3,7 @@ package fr.augustine.androgustine.model
 data class RaceState(
     // Timing (géré par le Chrono)
     val currentLap: Int = 1,
-    val totalLaps: Int = 11,
+    val totalLaps: Int = 0,
     val totalTime: String = "00:00",
 
     // Télémétrie (gérée par le Pilote)

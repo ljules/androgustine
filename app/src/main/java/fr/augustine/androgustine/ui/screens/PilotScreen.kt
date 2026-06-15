@@ -123,7 +123,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                         Image(painterResource(R.drawable.ico_loop), null, Modifier.size(38.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = uiState.lapProgress, //TODO : Vérifier que le nombre de tours total vient de la variable totalLaps mis à jour avec le JSON.
+                            text = uiState.lapProgress,
                             style= textStyle.copy(
                                 fontSize = 32.sp,
                                 fontWeight = FontWeight.Bold

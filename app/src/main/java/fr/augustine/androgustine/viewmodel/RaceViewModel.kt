@@ -74,6 +74,8 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val points = circuitManager.loadCircuitFromInternalStorage()
                 _uiState.value = _uiState.value.copy(
+                    lapProgress = "1/--",
+                    totalLaps = 11,
                     circuitPoints = points,
                     circuitSource = "CSV local",
                     activeStrategyName = "Départ",
@@ -95,6 +97,8 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     fun useImportedCircuitIfAvailable() {
         val importedCircuit = SimAugustineImportRepository.getCurrentCircuit() ?: return
         _uiState.value = _uiState.value.copy(
+            lapProgress = "1/${importedCircuit.totalLaps}",
+            totalLaps = importedCircuit.totalLaps,
             circuitPoints = importedCircuit.points,
             circuitSource = importedCircuit.sourceLabel,
             activeStrategyName = "Départ",
@@ -180,7 +184,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private fun incrementLap(lapStartTime: Long) {
         val parts = _uiState.value.lapProgress.split("/")
         val currentLapNumber = parts[0].toIntOrNull() ?: 1
-        val totalLaps = parts.getOrNull(1)?.toIntOrNull() ?: 11
+        val totalLaps = _uiState.value.totalLaps
 
         if (currentLapNumber < totalLaps) {
             val nextLap = currentLapNumber + 1
