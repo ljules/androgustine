@@ -14,6 +14,8 @@ import fr.augustine.androgustine.data.imports.SimAugustineImportRepository
 import fr.augustine.androgustine.data.logging.SessionCsvLogRow
 import fr.augustine.androgustine.data.logging.SessionCsvLogger
 import fr.augustine.androgustine.data.timer.TimeService
+import fr.augustine.androgustine.data.telemetry.PilotTelemetrySnapshot
+import fr.augustine.androgustine.data.telemetry.TelemetryFirestoreRepository
 import fr.augustine.androgustine.data.weather.WeatherFetchResult
 import fr.augustine.androgustine.data.weather.WeatherService
 import fr.augustine.androgustine.model.PilotUiState
@@ -35,6 +37,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private val sessionLogger = SessionCsvLogger(application)
     private val weatherService = WeatherService()
     private val heartRateBleManager = HeartRateBleManager(application)
+    private val telemetryFirestoreRepository = TelemetryFirestoreRepository(application)
 
     private val _uiState = MutableStateFlow(PilotUiState())
     val uiState: StateFlow<PilotUiState> = _uiState.asStateFlow()
@@ -149,6 +152,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         lastLapTimestamp = now // Le chrono commence, le tour 1 aussi
         lapStartTimeMs = now
         sessionLogger.startSession(now)
+        telemetryFirestoreRepository.startSession(now)
         viewModelScope.launch {
             timeService.timerFlow().collect { seconds ->
                 _uiState.value = _uiState.value.copy(
@@ -297,6 +301,10 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
         val now = System.currentTimeMillis()
         val state = _uiState.value
+        val timestampIso = isoTimestamp.format(Date(now))
+        val elapsedSessionS = (now - sessionStartTimeMs) / 1000.0
+        val elapsedLapS = (now - lapStartTimeMs) / 1000.0
+        val currentLap = getCurrentLapNumber(state)
         val snappedDistanceM = findNearestCircuitDistance(
             state.circuitPoints,
             currentLat,
@@ -305,10 +313,10 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
         sessionLogger.write(
             SessionCsvLogRow(
-                timestampIso = isoTimestamp.format(Date(now)),
-                elapsedSessionS = (now - sessionStartTimeMs) / 1000.0,
-                elapsedLapS = (now - lapStartTimeMs) / 1000.0,
-                currentLap = getCurrentLapNumber(state),
+                timestampIso = timestampIso,
+                elapsedSessionS = elapsedSessionS,
+                elapsedLapS = elapsedLapS,
+                currentLap = currentLap,
                 activeStrategy = state.activeStrategyName,
                 gpsLat = currentLat,
                 gpsLon = currentLon,
@@ -321,6 +329,27 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                 weatherRainProbability = state.weatherRainProbability,
                 heartRateBpm = state.heartRateBpm
             )
+        )
+
+        telemetryFirestoreRepository.publishLatest(
+            PilotTelemetrySnapshot(
+                timestampIso = timestampIso,
+                elapsedSessionS = elapsedSessionS,
+                elapsedLapS = elapsedLapS,
+                currentLap = currentLap,
+                activeStrategy = state.activeStrategyName,
+                gpsLat = currentLat,
+                gpsLon = currentLon,
+                gpsSpeedKmh = speedKmh,
+                snappedDistanceM = snappedDistanceM,
+                ghostDistanceM = state.ghostDistanceM,
+                deltaDistanceM = state.ghostDeltaDistanceM,
+                heartRateBpm = state.heartRateBpm,
+                weatherTemperatureC = state.weatherTemperatureC,
+                weatherWindKmh = state.weatherWindKmh,
+                weatherRainProbability = state.weatherRainProbability
+            ),
+            nowMs = now
         )
     }
 
