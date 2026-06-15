@@ -277,10 +277,10 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
 //
 //                ) {
                     Box(
-                        modifier = Modifier.weight(0.4f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier.weight(0.4f).fillMaxWidth().padding(end = 80.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Row(verticalAlignment = Alignment.Bottom) {
+                        Row(verticalAlignment = Alignment.Bottom, ) {
                             Text(
                                 text = "%.0f".format(uiState.speed),
                                 style = textStyle.copy(
@@ -312,7 +312,20 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                 //}
 
                 // Colonne de la fréquence cardiaque :
-                //Column(){}
+                Column(
+                    modifier = Modifier.padding(end = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Image(painterResource(R.drawable.heart), null, Modifier.size(60.dp))
+                    Text(
+                        text = "${uiState.heartRateBpm?.toString() ?: "--"} bpm",
+                        style = textStyle.copy(
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
             }
 
             // --- LIGNE 3 (Drapeaux / Instructions) ---
@@ -353,6 +366,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                 .widthIn(min = 220.dp, max = 420.dp),
             horizontalAlignment = Alignment.End
         ) {
+            // Stratégie active :
             Text(
                 text = "Stratégie active : ${uiState.activeStrategyName}",
                 style = textStyle.copy(
@@ -361,6 +375,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                 )
             )
             Spacer(Modifier.height(4.dp))
+            // Etat du véhicule ghost :
             Text(
                 text = "Ghost : ${if (uiState.ghostPoint != null) "active" else "inactive"}",
                 style = textStyle.copy(
@@ -368,17 +383,8 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     fontWeight = FontWeight.Medium
                 )
             )
-            // TODO: Déplacer la fréquence cardiaque dans sa zone dédiée :
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "FC : ${uiState.heartRateBpm?.toString() ?: "--"} bpm",
-                style = textStyle.copy(
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            )
 
-
+            // Affichage de l'écart véhicule <-> ghost car :
             uiState.ghostDeltaDistanceM?.let { delta ->
                 Spacer(Modifier.height(4.dp))
                 Text(

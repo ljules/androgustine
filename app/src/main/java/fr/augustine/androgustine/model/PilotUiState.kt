@@ -9,6 +9,7 @@ data class PilotUiState(
     val speed: Float = 0f,
     val timer: String = "00:00",
     val lapProgress: String = "1/11",
+    val totalLaps: Int = 11,
     val circuitPoints: List<CircuitPoint> = emptyList(),
     val circuitSource: String = "CSV local",
     val activeStrategyName: String = "Départ",
