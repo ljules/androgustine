@@ -174,6 +174,7 @@ data class SimAugustineImportedCircuit(
     val points: List<CircuitPoint>,
     val sourceLabel: String,
     val totalLaps: Int?,
+    val totalDistanceM: Double,
     val trackName: String,
     val startStrategyIntervals: List<StrategyIntervalUi>,
     val raceStrategyIntervals: List<StrategyIntervalUi>,

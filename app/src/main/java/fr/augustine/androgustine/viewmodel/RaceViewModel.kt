@@ -10,6 +10,7 @@ import fr.augustine.androgustine.data.CircuitManager
 import fr.augustine.androgustine.data.CircuitPoint
 import fr.augustine.androgustine.data.GhostPoint
 import fr.augustine.androgustine.data.gps.GpsService
+import fr.augustine.androgustine.data.imports.SimAugustineImportedCircuit
 import fr.augustine.androgustine.data.imports.SimAugustineImportRepository
 import fr.augustine.androgustine.data.logging.SessionCsvLogRow
 import fr.augustine.androgustine.data.logging.SessionCsvLogger
@@ -49,6 +50,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private var lastWeatherFetchAttemptMs = 0L
     private var isWeatherFetchRunning = false
     private var heartRateJob: Job? = null
+    private var publishedTrackSignature: String? = null
 
     // CONFIGURATION DE LA COURSE
     companion object {
@@ -85,6 +87,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private fun startFirestoreTelemetry() {
         val now = System.currentTimeMillis()
         telemetryFirestoreRepository.startSession(now)
+        publishImportedTrackDataIfNeeded()
         publishWaitingFirestoreTelemetry(now)
     }
 
@@ -135,9 +138,41 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
             totalLaps = importedTotalLaps,
             trackName = importedCircuit.trackName
         )
+        publishImportedTrackDataIfNeeded()
         if (isTimerRunning) {
             updateGhostPosition()
         }
+    }
+
+    private fun publishImportedTrackDataIfNeeded() {
+        val importedCircuit = SimAugustineImportRepository.getCurrentCircuit() ?: return
+        val signature = buildTrackSignature(importedCircuit)
+        if (publishedTrackSignature == signature) return
+
+        telemetryFirestoreRepository.publishTrackData(
+            trackName = importedCircuit.trackName,
+            totalLaps = importedCircuit.totalLaps,
+            totalDistanceM = importedCircuit.totalDistanceM,
+            points = importedCircuit.points
+        )
+        publishedTrackSignature = signature
+    }
+
+    private fun buildTrackSignature(importedCircuit: SimAugustineImportedCircuit): String {
+        val firstPoint = importedCircuit.points.firstOrNull()
+        val lastPoint = importedCircuit.points.lastOrNull()
+        return listOf(
+            importedCircuit.trackName,
+            importedCircuit.totalLaps?.toString().orEmpty(),
+            importedCircuit.totalDistanceM.toString(),
+            importedCircuit.points.size.toString(),
+            firstPoint?.distance?.toString().orEmpty(),
+            firstPoint?.lat?.toString().orEmpty(),
+            firstPoint?.lon?.toString().orEmpty(),
+            lastPoint?.distance?.toString().orEmpty(),
+            lastPoint?.lat?.toString().orEmpty(),
+            lastPoint?.lon?.toString().orEmpty()
+        ).joinToString("|")
     }
 
     private fun startGpsTracking() {

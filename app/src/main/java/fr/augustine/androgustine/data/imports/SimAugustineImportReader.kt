@@ -114,6 +114,7 @@ private fun SimAugustineImport.toImportedCircuit(): SimAugustineImportedCircuit 
         },
         sourceLabel = "JSON Sim-Augustine",
         totalLaps = totalLaps,
+        totalDistanceM = circuit.distanceM ?: points.mapNotNull { it.distanceM }.maxOrNull() ?: 0.0,
         trackName = trackName,
         startStrategyIntervals = session.startLapStrategy?.intervals.orEmpty()
             .mapNotNull { it.toStrategyIntervalUi() },

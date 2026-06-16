@@ -5,9 +5,11 @@ import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import fr.augustine.androgustine.data.CircuitPoint
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.ceil
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -81,6 +83,80 @@ class TelemetryFirestoreRepository(
             }
             .addOnSuccessListener {
                 Log.i(TAG, "Session race context updated : $path")
+            }
+    }
+
+    fun publishTrackData(
+        trackName: String?,
+        totalLaps: Int?,
+        totalDistanceM: Double,
+        points: List<CircuitPoint>
+    ) {
+        if (!enabled) return
+
+        val activeSessionId = sessionId ?: return
+        val activeFirestore = initializeFirestoreIfNeeded() ?: return
+        val sampledPoints = points
+            .filter { point ->
+                point.distance.isFinite() &&
+                    point.lat.isFinite() &&
+                    point.lon.isFinite()
+            }
+            .sampleForFirestore()
+            .map { point ->
+                mapOf(
+                    "distanceM" to point.distance.toDouble(),
+                    "lat" to point.lat,
+                    "lon" to point.lon
+                )
+            }
+        if (sampledPoints.isEmpty()) return
+
+        val normalizedTrackName = normalizeTrackName(trackName)
+        val normalizedTotalDistanceM = totalDistanceM
+            .takeIf { it.isFinite() && it > 0.0 }
+            ?: points.maxOfOrNull { it.distance.toDouble() }
+            ?: 0.0
+        val parentFields = mutableMapOf<String, Any>(
+            "trackName" to normalizedTrackName,
+            "trackPublished" to true,
+            "trackPointCount" to sampledPoints.size,
+            "trackTotalDistanceM" to normalizedTotalDistanceM
+        )
+        totalLaps?.let { parentFields["totalLaps"] = it }
+
+        val sessionRef = activeFirestore
+            .collection("raceSessions")
+            .document(activeSessionId)
+        val trackRef = sessionRef
+            .collection("track")
+            .document("current")
+        val trackPath = "raceSessions/$activeSessionId/track/current"
+
+        activeFirestore
+            .batch()
+            .set(sessionRef, parentFields, SetOptions.merge())
+            .set(
+                trackRef,
+                mapOf(
+                    "trackName" to normalizedTrackName,
+                    "totalDistanceM" to normalizedTotalDistanceM,
+                    "pointCount" to sampledPoints.size,
+                    "points" to sampledPoints
+                ),
+                SetOptions.merge()
+            )
+            .commit()
+            .addOnFailureListener { error ->
+                recordError("Track data publish failed: ${error.message ?: error.javaClass.simpleName}")
+                Log.w(TAG, "Track data publish failed: $trackPath", error)
+            }
+            .addOnSuccessListener {
+                Log.i(
+                    TAG,
+                    "Track data published: $trackPath trackName=$normalizedTrackName " +
+                        "pointCount=${sampledPoints.size} totalDistanceM=$normalizedTotalDistanceM"
+                )
             }
     }
 
@@ -182,8 +258,24 @@ class TelemetryFirestoreRepository(
     private fun normalizeTrackName(trackName: String?): String =
         trackName?.takeIf { it.isNotBlank() } ?: "Unknown track"
 
+    private fun List<CircuitPoint>.sampleForFirestore(): List<CircuitPoint> {
+        if (size <= MAX_TRACK_POINT_COUNT) return this
+
+        val step = ceil(size.toDouble() / MAX_TRACK_POINT_COUNT).toInt().coerceAtLeast(1)
+        val sampled = filterIndexed { index, _ -> index % step == 0 }.toMutableList()
+        val lastPoint = last()
+        if (sampled.lastOrNull() != lastPoint) {
+            if (sampled.size >= MAX_TRACK_POINT_COUNT) {
+                sampled.removeAt(sampled.lastIndex)
+            }
+            sampled.add(lastPoint)
+        }
+        return sampled
+    }
+
     companion object {
         private const val TAG = "TelemetryFirestore"
+        private const val MAX_TRACK_POINT_COUNT = 1000
         private val sessionTimestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
         private val metadataTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
     }
