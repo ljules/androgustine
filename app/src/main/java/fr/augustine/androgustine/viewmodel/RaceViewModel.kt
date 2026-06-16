@@ -115,9 +115,10 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
     fun useImportedCircuitIfAvailable() {
         val importedCircuit = SimAugustineImportRepository.getCurrentCircuit() ?: return
+        val importedTotalLaps = importedCircuit.totalLaps
         _uiState.value = _uiState.value.copy(
-            lapProgress = "1/${importedCircuit.totalLaps}",
-            totalLaps = importedCircuit.totalLaps,
+            lapProgress = importedTotalLaps?.let { "1/$it" } ?: "1/--",
+            totalLaps = importedTotalLaps ?: 0,
             circuitPoints = importedCircuit.points,
             circuitSource = importedCircuit.sourceLabel,
             activeStrategyName = "Départ",
@@ -129,6 +130,10 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
             ghostPoint = null,
             ghostDistanceM = null,
             ghostDeltaDistanceM = null
+        )
+        telemetryFirestoreRepository.updateSessionRaceContext(
+            totalLaps = importedTotalLaps,
+            trackName = importedCircuit.trackName
         )
         if (isTimerRunning) {
             updateGhostPosition()

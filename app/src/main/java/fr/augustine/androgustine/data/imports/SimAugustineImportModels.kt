@@ -153,7 +153,7 @@ data class SimAugustineImportSummary(
     val circuitDistanceM: Double,
     val circuitPointCount: Int,
     val circuitSource: String,
-    val totalLaps: Int,
+    val totalLaps: Int?,
     val remainingRaceLaps: Int,
     val startLapTimeS: Double,
     val raceLapTimeS: Double,
@@ -173,7 +173,8 @@ data class SimAugustineImportSummary(
 data class SimAugustineImportedCircuit(
     val points: List<CircuitPoint>,
     val sourceLabel: String,
-    val totalLaps: Int,
+    val totalLaps: Int?,
+    val trackName: String,
     val startStrategyIntervals: List<StrategyIntervalUi>,
     val raceStrategyIntervals: List<StrategyIntervalUi>,
     val startGhostPoints: List<GhostPoint>,

@@ -60,6 +60,30 @@ class TelemetryFirestoreRepository(
             }
     }
 
+    fun updateSessionRaceContext(totalLaps: Int?, trackName: String?) {
+        if (!enabled) return
+
+        val activeSessionId = sessionId ?: return
+        val activeFirestore = initializeFirestoreIfNeeded() ?: return
+        val path = "raceSessions/$activeSessionId"
+        val contextFields = mutableMapOf<String, Any>(
+            "trackName" to normalizeTrackName(trackName)
+        )
+        totalLaps?.let { contextFields["totalLaps"] = it }
+
+        activeFirestore
+            .collection("raceSessions")
+            .document(activeSessionId)
+            .set(contextFields, SetOptions.merge())
+            .addOnFailureListener { error ->
+                recordError("Session race context update failed: ${error.message ?: error.javaClass.simpleName}")
+                Log.w(TAG, "Session race context update failed: $path", error)
+            }
+            .addOnSuccessListener {
+                Log.i(TAG, "Session race context updated : $path")
+            }
+    }
+
     fun publishLatest(snapshot: PilotTelemetrySnapshot, nowMs: Long = System.currentTimeMillis()) {
         if (!enabled) return
         if (nowMs - lastWriteAtMs < TelemetryConfig.FIRESTORE_MIN_WRITE_INTERVAL_MS) return
@@ -106,7 +130,8 @@ class TelemetryFirestoreRepository(
                     "createdAtIso" to metadataTimestamp.format(Date(createdAtMs)),
                     "status" to "WAITING",
                     "raceStarted" to false,
-                    "appRole" to "PILOT"
+                    "appRole" to "PILOT",
+                    "trackName" to "Unknown track"
                 ),
                 SetOptions.merge()
             )
@@ -153,6 +178,9 @@ class TelemetryFirestoreRepository(
             lastError = message
         )
     }
+
+    private fun normalizeTrackName(trackName: String?): String =
+        trackName?.takeIf { it.isNotBlank() } ?: "Unknown track"
 
     companion object {
         private const val TAG = "TelemetryFirestore"

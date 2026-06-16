@@ -62,7 +62,7 @@ private fun SimAugustineImport.toSummary(
     val circuitName = requireText(circuit.name, "circuit.name")
     val circuitDistanceM = requireValue(circuit.distanceM, "circuit.distanceM")
     val circuitPoints = requireList(circuit.points, "circuit.points")
-    val totalLaps = requireValue(session.totalLaps, "session.totalLaps")
+    val totalLaps = session.totalLaps
     val remainingRaceLaps = requireValue(session.remainingRaceLaps, "session.remainingRaceLaps")
     val startLapResult = requireBlock(simulation.startLapResult, "simulation.startLapResult")
     val raceLapResult = requireBlock(simulation.raceLapResult, "simulation.raceLapResult")
@@ -102,7 +102,8 @@ private fun SimAugustineImport.toImportedCircuit(): SimAugustineImportedCircuit 
     val circuit = requireBlock(circuit, "circuit")
     val session = requireBlock(session, "session")
     val points = requireList(circuit.points, "circuit.points")
-    val totalLaps = requireValue(session.totalLaps, "session.totalLaps")
+    val totalLaps = session.totalLaps
+    val trackName = circuit.name?.takeIf { it.isNotBlank() } ?: "Unknown track"
     if (points.isEmpty()) {
         throw SimAugustineImportException("Import incomplet : circuit.points est vide.")
     }
@@ -113,6 +114,7 @@ private fun SimAugustineImport.toImportedCircuit(): SimAugustineImportedCircuit 
         },
         sourceLabel = "JSON Sim-Augustine",
         totalLaps = totalLaps,
+        trackName = trackName,
         startStrategyIntervals = session.startLapStrategy?.intervals.orEmpty()
             .mapNotNull { it.toStrategyIntervalUi() },
         raceStrategyIntervals = session.raceLapStrategy?.intervals.orEmpty()

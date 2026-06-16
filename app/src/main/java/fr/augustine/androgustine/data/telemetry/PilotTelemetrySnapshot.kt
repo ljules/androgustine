@@ -23,6 +23,8 @@ data class PilotTelemetrySnapshot(
         "raceStarted" to raceStarted,
         "elapsedSessionS" to elapsedSessionS,
         "elapsedLapS" to elapsedLapS,
+        "elapsedSessionFormatted" to elapsedSessionS.formatDuration(),
+        "elapsedLapFormatted" to elapsedLapS.formatDuration(),
         "currentLap" to currentLap,
         "activeStrategy" to activeStrategy,
         "gpsLat" to gpsLat,
@@ -36,4 +38,11 @@ data class PilotTelemetrySnapshot(
         "weatherWindKmh" to weatherWindKmh,
         "weatherRainProbability" to weatherRainProbability
     )
+}
+
+private fun Double.formatDuration(): String {
+    val totalSeconds = if (isFinite()) toInt().coerceAtLeast(0) else 0
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%02d:%02d".format(minutes, seconds)
 }
