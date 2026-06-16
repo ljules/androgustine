@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,8 +30,34 @@ class TelemetryFirestoreRepository(
         }
         _status.value = _status.value.copy(sessionId = sessionId)
         Log.i(TAG, "Telemetry Firestore sessionId=$sessionId")
-        initializeFirestoreIfNeeded()
+        createSessionDocument(startTimeMs)
         return sessionId.orEmpty()
+    }
+
+    fun markRaceStarted() {
+        if (!enabled) return
+
+        val activeSessionId = sessionId ?: return
+        val activeFirestore = initializeFirestoreIfNeeded() ?: return
+        val path = "raceSessions/$activeSessionId"
+
+        activeFirestore
+            .collection("raceSessions")
+            .document(activeSessionId)
+            .set(
+                mapOf(
+                    "status" to "RUNNING",
+                    "raceStarted" to true
+                ),
+                SetOptions.merge()
+            )
+            .addOnFailureListener { error ->
+                recordError("Session document update failed: ${error.message ?: error.javaClass.simpleName}")
+                Log.w(TAG, "Session document update failed: $path", error)
+            }
+            .addOnSuccessListener {
+                Log.i(TAG, "Session document updated : $path")
+            }
     }
 
     fun publishLatest(snapshot: PilotTelemetrySnapshot, nowMs: Long = System.currentTimeMillis()) {
@@ -49,10 +76,7 @@ class TelemetryFirestoreRepository(
             .set(snapshot.toFirestoreMap())
             .addOnFailureListener { error ->
                 val message = error.message ?: error.javaClass.simpleName
-                _status.value = _status.value.copy(
-                    errorCount = _status.value.errorCount + 1,
-                    lastError = message
-                )
+                recordError(message)
                 Log.w(TAG, "Telemetry Firestore write failed: $message", error)
             }
             .addOnSuccessListener {
@@ -63,6 +87,35 @@ class TelemetryFirestoreRepository(
                     lastError = null
                 )
                 Log.d(TAG, "Telemetry Firestore latest updated for $activeSessionId")
+            }
+    }
+
+    private fun createSessionDocument(createdAtMs: Long) {
+        if (!enabled) return
+
+        val activeSessionId = sessionId ?: return
+        val activeFirestore = initializeFirestoreIfNeeded() ?: return
+        val path = "raceSessions/$activeSessionId"
+
+        activeFirestore
+            .collection("raceSessions")
+            .document(activeSessionId)
+            .set(
+                mapOf(
+                    "sessionId" to activeSessionId,
+                    "createdAtIso" to metadataTimestamp.format(Date(createdAtMs)),
+                    "status" to "WAITING",
+                    "raceStarted" to false,
+                    "appRole" to "PILOT"
+                ),
+                SetOptions.merge()
+            )
+            .addOnFailureListener { error ->
+                recordError("Session document creation failed: ${error.message ?: error.javaClass.simpleName}")
+                Log.w(TAG, "Session document creation failed: $path", error)
+            }
+            .addOnSuccessListener {
+                Log.i(TAG, "Session document created : $path")
             }
     }
 
@@ -78,10 +131,7 @@ class TelemetryFirestoreRepository(
             }
             if (FirebaseApp.getApps(context).isEmpty()) {
                 val message = "Firebase is not initialized. Add app/google-services.json to enable Firestore telemetry."
-                _status.value = _status.value.copy(
-                    errorCount = _status.value.errorCount + 1,
-                    lastError = message
-                )
+                recordError(message)
                 Log.w(TAG, message)
                 null
             } else {
@@ -92,16 +142,21 @@ class TelemetryFirestoreRepository(
             }
         }.onFailure { error ->
             val message = error.message ?: error.javaClass.simpleName
-            _status.value = _status.value.copy(
-                errorCount = _status.value.errorCount + 1,
-                lastError = message
-            )
+            recordError(message)
             Log.w(TAG, "Telemetry Firestore initialization failed: $message", error)
         }.getOrNull()
+    }
+
+    private fun recordError(message: String) {
+        _status.value = _status.value.copy(
+            errorCount = _status.value.errorCount + 1,
+            lastError = message
+        )
     }
 
     companion object {
         private const val TAG = "TelemetryFirestore"
         private val sessionTimestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
+        private val metadataTimestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
     }
 }

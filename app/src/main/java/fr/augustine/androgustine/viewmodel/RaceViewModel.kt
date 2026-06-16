@@ -174,6 +174,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         lastLapTimestamp = now // Le chrono commence, le tour 1 aussi
         lapStartTimeMs = now
         sessionLogger.startSession(now)
+        telemetryFirestoreRepository.markRaceStarted()
         viewModelScope.launch {
             timeService.timerFlow().collect { seconds ->
                 _uiState.value = _uiState.value.copy(
