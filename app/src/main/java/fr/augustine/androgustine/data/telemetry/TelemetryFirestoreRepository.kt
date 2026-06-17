@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import fr.augustine.androgustine.data.CircuitPoint
+import fr.augustine.androgustine.data.StrategyIntervalUi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -162,6 +163,39 @@ class TelemetryFirestoreRepository(
             }
     }
 
+    fun publishStrategySegments(
+        startSegments: List<StrategyIntervalUi>,
+        raceSegments: List<StrategyIntervalUi>
+    ) {
+        if (!enabled) return
+
+        val activeSessionId = sessionId ?: return
+        val activeFirestore = initializeFirestoreIfNeeded() ?: return
+        val path = "raceSessions/$activeSessionId/strategy/current"
+        val strategyData = mapOf(
+            "startSegments" to startSegments.toFirestoreSegments(),
+            "raceSegments" to raceSegments.toFirestoreSegments()
+        )
+
+        activeFirestore
+            .collection("raceSessions")
+            .document(activeSessionId)
+            .collection("strategy")
+            .document("current")
+            .set(strategyData, SetOptions.merge())
+            .addOnFailureListener { error ->
+                recordError("Strategy segments publish failed: ${error.message ?: error.javaClass.simpleName}")
+                Log.w(TAG, "Strategy segments publish failed: $path", error)
+            }
+            .addOnSuccessListener {
+                Log.i(
+                    TAG,
+                    "Strategy segments published: $path " +
+                        "startSegments=${startSegments.size} raceSegments=${raceSegments.size}"
+                )
+            }
+    }
+
     fun publishLatest(snapshot: PilotTelemetrySnapshot, nowMs: Long = System.currentTimeMillis()) {
         if (!enabled) return
         if (nowMs - lastWriteAtMs < TelemetryConfig.FIRESTORE_MIN_WRITE_INTERVAL_MS) return
@@ -295,6 +329,19 @@ class TelemetryFirestoreRepository(
 
     private fun normalizeTrackName(trackName: String?): String =
         trackName?.takeIf { it.isNotBlank() } ?: "Unknown track"
+
+    private fun List<StrategyIntervalUi>.toFirestoreSegments(): List<Map<String, Any>> =
+        filter { segment ->
+            segment.startDistanceM.isFinite() &&
+                segment.endDistanceM.isFinite() &&
+                segment.endDistanceM > segment.startDistanceM
+        }.map { segment ->
+            mapOf(
+                "startDistanceM" to segment.startDistanceM.toDouble(),
+                "endDistanceM" to segment.endDistanceM.toDouble(),
+                "color" to segment.buttonColor.orEmpty()
+            )
+        }
 
     private fun List<CircuitPoint>.sampleForFirestore(): List<CircuitPoint> {
         if (size <= MAX_TRACK_POINT_COUNT) return this

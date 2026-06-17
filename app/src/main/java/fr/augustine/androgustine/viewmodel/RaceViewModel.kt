@@ -51,6 +51,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     private var isWeatherFetchRunning = false
     private var heartRateJob: Job? = null
     private var publishedTrackSignature: String? = null
+    private var publishedStrategySignature: String? = null
 
     // CONFIGURATION DE LA COURSE
     companion object {
@@ -91,6 +92,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(raceInstructions = instructions)
         }
         publishImportedTrackDataIfNeeded()
+        publishImportedStrategySegmentsIfNeeded()
         publishWaitingFirestoreTelemetry(now)
     }
 
@@ -142,6 +144,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
             trackName = importedCircuit.trackName
         )
         publishImportedTrackDataIfNeeded()
+        publishImportedStrategySegmentsIfNeeded()
         if (isTimerRunning) {
             updateGhostPosition()
         }
@@ -161,6 +164,18 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         publishedTrackSignature = signature
     }
 
+    private fun publishImportedStrategySegmentsIfNeeded() {
+        val importedCircuit = SimAugustineImportRepository.getCurrentCircuit() ?: return
+        val signature = buildStrategySignature(importedCircuit)
+        if (publishedStrategySignature == signature) return
+
+        telemetryFirestoreRepository.publishStrategySegments(
+            startSegments = importedCircuit.startStrategyIntervals,
+            raceSegments = importedCircuit.raceStrategyIntervals
+        )
+        publishedStrategySignature = signature
+    }
+
     private fun buildTrackSignature(importedCircuit: SimAugustineImportedCircuit): String {
         val firstPoint = importedCircuit.points.firstOrNull()
         val lastPoint = importedCircuit.points.lastOrNull()
@@ -177,6 +192,16 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
             lastPoint?.lon?.toString().orEmpty()
         ).joinToString("|")
     }
+
+    private fun buildStrategySignature(importedCircuit: SimAugustineImportedCircuit): String =
+        listOf(
+            importedCircuit.startStrategyIntervals.joinToString(";") { interval ->
+                "${interval.startDistanceM}:${interval.endDistanceM}:${interval.buttonColor.orEmpty()}"
+            },
+            importedCircuit.raceStrategyIntervals.joinToString(";") { interval ->
+                "${interval.startDistanceM}:${interval.endDistanceM}:${interval.buttonColor.orEmpty()}"
+            }
+        ).joinToString("|")
 
     private fun startGpsTracking() {
         viewModelScope.launch {
