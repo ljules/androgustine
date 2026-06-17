@@ -29,7 +29,11 @@ import fr.augustine.androgustine.ui.components.CircuitView
 import fr.augustine.androgustine.ui.theme.OxaniumFontFamily
 import fr.augustine.androgustine.ui.theme.ShellGrey
 import fr.augustine.androgustine.ui.theme.ShellOrange
+import fr.augustine.androgustine.ui.theme.DangerRed
 import fr.augustine.androgustine.ui.theme.FlagGreen
+import fr.augustine.androgustine.ui.theme.FlagYellow
+import fr.augustine.androgustine.ui.theme.RacingCyan
+import fr.augustine.androgustine.data.telemetry.RaceInstructions
 import fr.augustine.androgustine.viewmodel.RaceViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -94,6 +98,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
 
     val uiState by viewModel.uiState.collectAsState()
     val hasImportedStrategy = uiState.circuitSource == "JSON Sim-Augustine"
+    val raceInstructions = uiState.raceInstructions
 
     // Style de base pour la police :
     val textStyle = androidx.compose.ui.text.TextStyle(
@@ -133,14 +138,19 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                             )
                     }
                     Spacer(Modifier.height(10.dp))
-                    // TODO : Conditionner l'affichage de l'image ico_stands et du texte stands selon l'état de pitStopRequest,
-                    // si true afficher icône et le texte, sinon ne rien afficher.
-                    Image(painterResource(R.drawable.ico_stands), null, Modifier.size(60.dp))
+                    if (raceInstructions.pitStopRequest) {
+                        Image(painterResource(R.drawable.ico_stands), null, Modifier.size(60.dp))
+                    }
                     Text(
-                        text = "stands",
+                        text = if (raceInstructions.pitStopRequest) {
+                            "STAND"
+                        } else {
+                            "Stand : false"
+                        },
                         style = textStyle.copy(
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = if (raceInstructions.pitStopRequest) 32.sp else 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (raceInstructions.pitStopRequest) DangerRed else ShellGrey
                         )
                     )
                 }
@@ -208,12 +218,11 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     Spacer(Modifier.height(8.dp))
                     Image(painterResource(R.drawable.ico_speed_meter), null, Modifier.size(60.dp))
                     Text(
-                        // TODO: Le texte doit prendre la valeur et la couleur dépend de la variable PilotPaceInstruction :
-                        //  "accélérer" en rouge si ACCELERATE, "maintenir" en vert si MAINTAIN, "ralentir" en bleu si SLOW_DOWN
-                        text = "accélérer",
+                        text = "Cadence : ${paceInstructionLabel(raceInstructions.pilotPaceInstruction)}",
                         style = textStyle.copy(
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = paceInstructionColor(raceInstructions.pilotPaceInstruction)
                         )
                     )
                 }
@@ -337,25 +346,18 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                // TODO: Vérifier que l'affichage des drapeaux est bien conditionné à la variable raceStatusInstruction:
-                // Si RACE alors ico_on_track, si NO_OVERTAKING alors flag_yellow et si STOP alors flag_red
                 Image(
-                    //painter = painterResource(id = if (uiState.flag == "jaune") R.drawable.flag_yellow else R.drawable.flag_red),
-                    painter = painterResource(id = when (uiState.flag) {
-                        "jaune" -> R.drawable.flag_yellow
-                        "rouge" -> R.drawable.flag_red
-                        else -> R.drawable.ico_on_track
-                    }),
+                    painter = painterResource(id = raceStatusIcon(raceInstructions.raceStatusInstruction)),
                     contentDescription = null,
                     modifier = Modifier.size(50.dp)
                 )
                 Spacer(Modifier.width(16.dp))
                 Text(
-                    text = uiState.flag,
+                    text = "État course : ${raceStatusLabel(raceInstructions.raceStatusInstruction)}",
                     style = textStyle.copy(
-                        fontSize = 35.sp,
+                        fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
-                        color = FlagGreen
+                        color = raceStatusColor(raceInstructions.raceStatusInstruction)
                     )
                 )
             }
@@ -464,6 +466,41 @@ private fun firestoreColor(enabled: Boolean, lastError: String?): Color =
         !enabled -> ShellGrey
         lastError != null -> Color.Red
         else -> FlagGreen
+    }
+
+private fun paceInstructionLabel(value: String): String =
+    when (value) {
+        RaceInstructions.PACE_ACCELERATE -> "ACCÉLÉRER"
+        RaceInstructions.PACE_SLOW_DOWN -> "RALENTIR"
+        else -> "MAINTENIR"
+    }
+
+private fun paceInstructionColor(value: String): Color =
+    when (value) {
+        RaceInstructions.PACE_ACCELERATE -> DangerRed
+        RaceInstructions.PACE_SLOW_DOWN -> RacingCyan
+        else -> FlagGreen
+    }
+
+private fun raceStatusLabel(value: String): String =
+    when (value) {
+        RaceInstructions.STATUS_NO_OVERTAKING -> "NE PAS DOUBLER"
+        RaceInstructions.STATUS_STOP -> "STOP"
+        else -> "COURSE"
+    }
+
+private fun raceStatusColor(value: String): Color =
+    when (value) {
+        RaceInstructions.STATUS_NO_OVERTAKING -> FlagYellow
+        RaceInstructions.STATUS_STOP -> DangerRed
+        else -> FlagGreen
+    }
+
+private fun raceStatusIcon(value: String): Int =
+    when (value) {
+        RaceInstructions.STATUS_NO_OVERTAKING -> R.drawable.flag_yellow
+        RaceInstructions.STATUS_STOP -> R.drawable.flag_red
+        else -> R.drawable.ico_on_track
     }
 
 private fun requiredBluetoothPermissions(): Array<String> =

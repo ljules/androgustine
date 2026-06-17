@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import fr.augustine.androgustine.data.CircuitPoint
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,7 @@ class TelemetryFirestoreRepository(
     private var sessionId: String? = null
     private var lastWriteAtMs = 0L
     private var initializationAttempted = false
+    private var instructionsRegistration: ListenerRegistration? = null
     private val _status = MutableStateFlow(FirestoreStatus(enabled = enabled))
     val status: StateFlow<FirestoreStatus> = _status.asStateFlow()
 
@@ -188,6 +190,42 @@ class TelemetryFirestoreRepository(
                 )
                 Log.d(TAG, "Telemetry Firestore latest updated for $activeSessionId")
             }
+    }
+
+    fun listenInstructions(
+        sessionId: String,
+        onInstructions: (RaceInstructions) -> Unit
+    ) {
+        if (!enabled) return
+
+        val activeFirestore = initializeFirestoreIfNeeded() ?: return
+        val path = "raceSessions/$sessionId/instructions/current"
+
+        instructionsRegistration?.remove()
+        instructionsRegistration = activeFirestore
+            .collection("raceSessions")
+            .document(sessionId)
+            .collection("instructions")
+            .document("current")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    val message = "Instructions listener failed: ${error.message ?: error.javaClass.simpleName}"
+                    recordError(message)
+                    Log.w(TAG, "$message path=$path", error)
+                    return@addSnapshotListener
+                }
+
+                val instructions = RaceInstructions.fromFirestore(snapshot?.data)
+                onInstructions(instructions)
+                Log.d(TAG, "Instructions updated from $path: $instructions")
+            }
+
+        Log.i(TAG, "Listening instructions: $path")
+    }
+
+    fun stopListeningInstructions() {
+        instructionsRegistration?.remove()
+        instructionsRegistration = null
     }
 
     private fun createSessionDocument(createdAtMs: Long) {

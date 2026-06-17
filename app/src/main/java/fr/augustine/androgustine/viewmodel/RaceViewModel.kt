@@ -86,7 +86,10 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startFirestoreTelemetry() {
         val now = System.currentTimeMillis()
-        telemetryFirestoreRepository.startSession(now)
+        val sessionId = telemetryFirestoreRepository.startSession(now)
+        telemetryFirestoreRepository.listenInstructions(sessionId) { instructions ->
+            _uiState.value = _uiState.value.copy(raceInstructions = instructions)
+        }
         publishImportedTrackDataIfNeeded()
         publishWaitingFirestoreTelemetry(now)
     }
@@ -512,6 +515,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        telemetryFirestoreRepository.stopListeningInstructions()
         sessionLogger.stopSession()
         super.onCleared()
     }

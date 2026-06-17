@@ -5,6 +5,7 @@ import fr.augustine.androgustine.data.CircuitPoint
 import fr.augustine.androgustine.data.GhostPoint
 import fr.augustine.androgustine.data.StrategyIntervalUi
 import fr.augustine.androgustine.data.telemetry.FirestoreStatus
+import fr.augustine.androgustine.data.telemetry.RaceInstructions
 
 data class PilotUiState(
     val speed: Float = 0f,
@@ -28,6 +29,7 @@ data class PilotUiState(
     val weatherStatusMessage: String = "Meteo : attente GPS",
     val heartRateBpm: Int? = null,
     val firestoreStatus: FirestoreStatus = FirestoreStatus(enabled = false),
+    val raceInstructions: RaceInstructions = RaceInstructions.DEFAULT,
     val currentLat: Double = 0.0,
     val currentLon: Double = 0.0,
     val instruction: String = "MAINTENIR",
