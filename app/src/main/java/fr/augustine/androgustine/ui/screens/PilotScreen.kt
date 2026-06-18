@@ -55,11 +55,12 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
     ) {
         viewModel.startHeartRateTracking()
     }
-
+    // Demande d'autorisation pour le Bluetooth :
     LaunchedEffect(Unit) {
         bluetoothPermissionLauncher.launch(requiredBluetoothPermissions())
     }
 
+    // Import du JSON du circuit simulé :
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -106,6 +107,10 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
         color = Color.White
     )
 
+    // AFFICHAGE DE L'ECRAN (layout & éléments présentés) :
+    // ----------------------------------------------------
+
+    // Box d'affichage en plein écran :
     Box(modifier = Modifier.fillMaxSize()) {
 
         // Fond d'écran avec tachymètre
@@ -116,11 +121,12 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             contentScale = ContentScale.Crop
         )
 
-        // Grille principale :
+        // Grille principale de layout (occupe toute la boxe) :
         Column(modifier = Modifier.fillMaxSize()) {
 
             // --- LIGNE 1 (Tours, Circuit, Temps) ---
             Row(modifier = Modifier.weight(0.4f).fillMaxWidth()) {
+
                 // Zone Tours (Haut Gauche)
                 Column(
                     modifier = Modifier.weight(1f).fillMaxHeight().padding(8.dp),
@@ -145,7 +151,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                         text = if (raceInstructions.pitStopRequest) {
                             "STAND"
                         } else {
-                            "Stand : false"
+                            ""
                         },
                         style = textStyle.copy(
                             fontSize = if (raceInstructions.pitStopRequest) 32.sp else 20.sp,
@@ -218,7 +224,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     Spacer(Modifier.height(8.dp))
                     Image(painterResource(R.drawable.ico_speed_meter), null, Modifier.size(60.dp))
                     Text(
-                        text = "Cadence : ${paceInstructionLabel(raceInstructions.pilotPaceInstruction)}",
+                        text = paceInstructionLabel(raceInstructions.pilotPaceInstruction),
                         style = textStyle.copy(
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
@@ -229,7 +235,6 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             }
 
             // --- LIGNE 2 (Vitesse Centrale) ---
-            // TODO : Découper en 3  colonnes, colonne 1 en 3 lignes info météo, colonne 2 vitesse, colone 3 en 2 lignes rythme cardiaque
             Row() {
                 // Colonne des infos météo :
                 Column(
@@ -287,9 +292,8 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
 //                Column(
 //
 //                ) {
-                    Box(
-                        modifier = Modifier.weight(0.4f).fillMaxWidth().padding(end = 80.dp),
-                        contentAlignment = Alignment.Center,
+                    Column(
+                        modifier = Modifier.weight(0.4f).fillMaxWidth().padding(start = 50.dp),
                     ) {
                         Row(verticalAlignment = Alignment.Bottom, ) {
                             Text(
@@ -340,7 +344,6 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             }
 
             // --- LIGNE 3 (Drapeaux / Instructions) ---
-            // TODO: Découper en 3 colonnes : A gauche la consommation, au centre le statut de course avec les icônes des drapeaux, à droite info de l'application
             Row(
                 modifier = Modifier.weight(0.2f).fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -353,7 +356,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                 )
                 Spacer(Modifier.width(16.dp))
                 Text(
-                    text = "État course : ${raceStatusLabel(raceInstructions.raceStatusInstruction)}",
+                    text = raceStatusLabel(raceInstructions.raceStatusInstruction),
                     style = textStyle.copy(
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
@@ -363,6 +366,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             }
         }
 
+        // Informations diverses :
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -372,7 +376,7 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
         ) {
             // Stratégie active :
             Text(
-                text = "Stratégie active : ${uiState.activeStrategyName}",
+                text = "Stratégie : ${uiState.activeStrategyName}",
                 style = textStyle.copy(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium
@@ -380,25 +384,25 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
             )
             Spacer(Modifier.height(4.dp))
             // Etat du véhicule ghost :
-            Text(
-                text = "Ghost : ${if (uiState.ghostPoint != null) "active" else "inactive"}",
-                style = textStyle.copy(
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            )
+//            Text(
+//                text = "Ghost : ${if (uiState.ghostPoint != null) "active" else "inactive"}",
+//                style = textStyle.copy(
+//                    fontSize = 13.sp,
+//                    fontWeight = FontWeight.Medium
+//                )
+//            )
 
             // Affichage de l'écart véhicule <-> ghost car :
-            uiState.ghostDeltaDistanceM?.let { delta ->
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Delta distance : ${formatNumber(delta.toDouble())} m",
-                    style = textStyle.copy(
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                )
-            }
+//            uiState.ghostDeltaDistanceM?.let { delta ->
+//                Spacer(Modifier.height(4.dp))
+//                Text(
+//                    text = "Delta distance : ${formatNumber(delta.toDouble())} m",
+//                    style = textStyle.copy(
+//                        fontSize = 13.sp,
+//                        fontWeight = FontWeight.Medium
+//                    )
+//                )
+//            }
 
             Spacer(Modifier.height(8.dp))
             val firestoreStatus = uiState.firestoreStatus
@@ -414,45 +418,60 @@ fun PilotScreen(viewModel: RaceViewModel = viewModel()) {
                     color = firestoreColor(firestoreStatus.enabled, firestoreStatus.lastError)
                 )
             )
-            Text(
-                text = "Session : ${firestoreStatus.sessionId ?: "--"}",
-                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            )
-            Text(
-                text = "Derniere synchro : ${formatSyncTime(firestoreStatus.lastSuccessEpochMs)}",
-                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            )
-            Text(
-                text = "Ecritures : ${firestoreStatus.writeCount}",
-                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            )
-            Text(
-                text = "Erreurs : ${firestoreStatus.errorCount}",
-                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            )
-            firestoreStatus.lastError?.let { error ->
-                Text(
-                    text = "Derniere erreur : $error",
-                    style = textStyle.copy(
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.Red
-                    )
-                )
-            }
+//            Text(
+//                text = "Session : ${firestoreStatus.sessionId ?: "--"}",
+//                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
+//            )
+//            Text(
+//                text = "Derniere synchro : ${formatSyncTime(firestoreStatus.lastSuccessEpochMs)}",
+//                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
+//            )
+//            Text(
+//                text = "Ecritures : ${firestoreStatus.writeCount}",
+//                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
+//            )
+//            Text(
+//                text = "Erreurs : ${firestoreStatus.errorCount}",
+//                style = textStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium)
+//            )
+//            firestoreStatus.lastError?.let { error ->
+//                Text(
+//                    text = "Derniere erreur : $error",
+//                    style = textStyle.copy(
+//                        fontSize = 11.sp,
+//                        fontWeight = FontWeight.Medium,
+//                        color = Color.Red
+//                    )
+//                )
+//            }
         }
     }
 }
 
+// FONCTIONS UTILITAIRES :
+// -----------------------
+
+/**
+ * Formate les valeurs numériques décimales
+ */
 private fun formatNumber(value: Double): String =
-    String.format(Locale.US, "%.2f", value)
+    String.format(Locale.FRENCH, "%.2f", value)
 
+/**
+ * Formate les valeurs numériques nullabes et retourne "--" si nulle
+ */
 private fun formatNullable(value: Float?): String =
-    value?.let { String.format(Locale.US, "%.1f", it) } ?: "--"
+    value?.let { String.format(Locale.FRENCH, "%.1f", it) } ?: "--"
 
+/**
+ * Formate les dates au format HH:mm:ss et -- si nulle
+ */
 private fun formatSyncTime(epochMs: Long?): String =
     epochMs?.let { SimpleDateFormat("HH:mm:ss", Locale.FRANCE).format(Date(it)) } ?: "--"
 
+/**
+ * Retourne la chaîne de caractères sur les information de l'état de connexion au Firestore
+ */
 private fun firestoreTitle(enabled: Boolean, writeCount: Int, lastError: String?): String =
     when {
         !enabled -> "Firestore desactive"
@@ -461,6 +480,9 @@ private fun firestoreTitle(enabled: Boolean, writeCount: Int, lastError: String?
         else -> "Firestore attente"
     }
 
+/**
+ * Retourne la couleur d'affichage de l'état du Firestore
+ */
 private fun firestoreColor(enabled: Boolean, lastError: String?): Color =
     when {
         !enabled -> ShellGrey
@@ -468,13 +490,19 @@ private fun firestoreColor(enabled: Boolean, lastError: String?): Color =
         else -> FlagGreen
     }
 
+/**
+ * Message associé au niveau de la CADENCE (accélérer, maintenir, ralentir)
+ */
 private fun paceInstructionLabel(value: String): String =
     when (value) {
-        RaceInstructions.PACE_ACCELERATE -> "ACCÉLÉRER"
-        RaceInstructions.PACE_SLOW_DOWN -> "RALENTIR"
-        else -> "MAINTENIR"
+        RaceInstructions.PACE_ACCELERATE -> "Accélérer"
+        RaceInstructions.PACE_SLOW_DOWN -> "Ralentir"
+        else -> "Maintenir"
     }
 
+/**
+ * Retourne la couleur associée à la CADENCE
+ */
 private fun paceInstructionColor(value: String): Color =
     when (value) {
         RaceInstructions.PACE_ACCELERATE -> DangerRed
@@ -482,13 +510,19 @@ private fun paceInstructionColor(value: String): Color =
         else -> FlagGreen
     }
 
+/**
+ * Retourne le message associé au drapeau de course (sans drapeau, drapeau jaune, drapeau rouge)
+ */
 private fun raceStatusLabel(value: String): String =
     when (value) {
         RaceInstructions.STATUS_NO_OVERTAKING -> "NE PAS DOUBLER"
         RaceInstructions.STATUS_STOP -> "STOP"
-        else -> "COURSE"
+        else -> "Course"
     }
 
+/**
+ * Retourne la couleur associé à au status de la course
+ */
 private fun raceStatusColor(value: String): Color =
     when (value) {
         RaceInstructions.STATUS_NO_OVERTAKING -> FlagYellow
@@ -496,6 +530,9 @@ private fun raceStatusColor(value: String): Color =
         else -> FlagGreen
     }
 
+/**
+ * Retourne l'icône/image associé au drapeau
+ */
 private fun raceStatusIcon(value: String): Int =
     when (value) {
         RaceInstructions.STATUS_NO_OVERTAKING -> R.drawable.flag_yellow
