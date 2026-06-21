@@ -6,7 +6,6 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fr.augustine.androgustine.data.ble.HeartRateBleManager
-import fr.augustine.androgustine.data.CircuitManager
 import fr.augustine.androgustine.data.CircuitPoint
 import fr.augustine.androgustine.data.GhostPoint
 import fr.augustine.androgustine.data.gps.GpsService
@@ -32,8 +31,6 @@ import java.util.Locale
 class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
     private val gpsService = GpsService(application)
-    // On passe 'application' (qui est un Context) au manager
-    private val circuitManager = CircuitManager(application)
     private val timeService = TimeService()
     private val sessionLogger = SessionCsvLogger(application)
     private val weatherService = WeatherService()
@@ -70,8 +67,6 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
     init {
         observeFirestoreStatus()
         startFirestoreTelemetry()
-        // Chargement du circuit au démarrage (Dossier Interne)
-        loadCircuitData()
         // Démarrage du flux GPS
         startGpsTracking()
         startHeartRateTracking()
@@ -94,31 +89,6 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
         publishImportedTrackDataIfNeeded()
         publishImportedStrategySegmentsIfNeeded()
         publishWaitingFirestoreTelemetry(now)
-    }
-
-    private fun loadCircuitData() {
-        viewModelScope.launch {
-            try {
-                val points = circuitManager.loadCircuitFromInternalStorage()
-                _uiState.value = _uiState.value.copy(
-                    lapProgress = "1/--",
-                    totalLaps = 11,
-                    circuitPoints = points,
-                    circuitSource = "CSV local",
-                    activeStrategyName = "Départ",
-                    activeStrategyIntervals = emptyList(),
-                    startStrategyIntervals = emptyList(),
-                    raceStrategyIntervals = emptyList(),
-                    startGhostPoints = emptyList(),
-                    raceGhostPoints = emptyList(),
-                    ghostPoint = null,
-                    ghostDistanceM = null,
-                    ghostDeltaDistanceM = null
-                )
-            } catch (e: Exception) {
-                Log.e("RaceViewModel", "CRASH lors du chargement : ${e.message}")
-            }
-        }
     }
 
     fun useImportedCircuitIfAvailable() {
@@ -495,13 +465,13 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun maybeRefreshWeather(latitude: Double, longitude: Double) {
         if (!latitude.isFinite() || !longitude.isFinite() || (latitude == 0.0 && longitude == 0.0)) {
-            _uiState.value = _uiState.value.copy(weatherStatusMessage = "Meteo : attente GPS")
+            _uiState.value = _uiState.value.copy(weatherStatusMessage = "Météo : attente GPS")
             return
         }
 
         val now = System.currentTimeMillis()
         if (isWeatherFetchRunning) return
-        val refreshIntervalMs = if (_uiState.value.weatherStatusMessage == "Meteo : OK") {
+        val refreshIntervalMs = if (_uiState.value.weatherStatusMessage == "Météo : OK") {
             WEATHER_REFRESH_INTERVAL_MS
         } else {
             WEATHER_RETRY_AFTER_ERROR_MS
@@ -512,7 +482,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
         lastWeatherFetchAttemptMs = now
         isWeatherFetchRunning = true
-        _uiState.value = _uiState.value.copy(weatherStatusMessage = "Meteo : requête en cours")
+        _uiState.value = _uiState.value.copy(weatherStatusMessage = "Météo : requête en cours")
         viewModelScope.launch {
             try {
                 when (val result = weatherService.fetchCurrentWeather(latitude, longitude)) {
@@ -521,7 +491,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
                             weatherTemperatureC = result.snapshot.temperatureC,
                             weatherWindKmh = result.snapshot.windKmh,
                             weatherRainProbability = result.snapshot.rainProbability,
-                            weatherStatusMessage = "Meteo : OK"
+                            weatherStatusMessage = "Météo : OK"
                         )
                         if (!isTimerRunning) {
                             publishWaitingFirestoreTelemetry()
@@ -530,7 +500,7 @@ class RaceViewModel(application: Application) : AndroidViewModel(application) {
 
                     is WeatherFetchResult.Failure -> {
                         Log.w("RaceViewModel", "Weather fetch failed: ${result.message}")
-                        _uiState.value = _uiState.value.copy(weatherStatusMessage = "Meteo : erreur réseau")
+                        _uiState.value = _uiState.value.copy(weatherStatusMessage = "Météo : erreur réseau")
                     }
                 }
             } finally {
