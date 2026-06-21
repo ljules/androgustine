@@ -56,7 +56,7 @@ fun CircuitView(
         drawPath(
             path = path,
             color = Color.White,
-            style = Stroke(width = 12f)
+            style = Stroke(width = 18f)
         )
 
         points.zipWithNext().forEach { (startPoint, endPoint) ->
@@ -71,7 +71,7 @@ fun CircuitView(
                     color = matchingInterval.buttonColor.toStrategyColor(),
                     start = getCanvasCoords(startPoint.utmX, startPoint.utmY),
                     end = getCanvasCoords(endPoint.utmX, endPoint.utmY),
-                    strokeWidth = 16f
+                    strokeWidth = 24f
                 )
             }
         }
@@ -80,12 +80,12 @@ fun CircuitView(
             val ghostCoords = getCanvasCoords(point.utmX, point.utmY)
             drawCircle(
                 color = Color(0xFF00E5FF).copy(alpha = 0.35f),
-                radius = 20f,
+                radius = 40f,
                 center = ghostCoords
             )
             drawCircle(
                 color = Color(0xFF00E5FF),
-                radius = 10f,
+                radius = 20f,
                 center = ghostCoords
             )
         }
@@ -98,12 +98,12 @@ fun CircuitView(
             val carCoords = getCanvasCoords(point.utmX, point.utmY)
             drawCircle(
                 color = Color.White.copy(alpha = 0.5f),
-                radius = 18f,
+                radius = 36f,
                 center = carCoords
             )
             drawCircle(
                 color = ShellOrange,
-                radius = 12f,
+                radius = 24f,
                 center = carCoords
             )
         }
